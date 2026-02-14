@@ -56,13 +56,13 @@ export const SortableTile: React.FC<SortableTileProps> = ({
                 title={title}
                 className={cn(
                     "h-full touch-none",
-                    targetView && "cursor-pointer hover:shadow-md hover:shadow-blue-500/10 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all duration-300"
+                    targetView && "cursor-pointer border-slate-200 dark:border-slate-700 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300"
                 )}
                 {...attributes}
                 {...listeners}
                 onClick={() => targetView && onNavigate(targetView)}
             >
-                <div className={cn(targetView && "hover:scale-[1.01] transition-transform duration-300 h-full")}>
+                <div className="h-full">
                     {children}
                 </div>
             </Card>

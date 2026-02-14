@@ -3,17 +3,32 @@ import { useQuery } from '../../hooks/useQuery';
 import { runQuery } from '../../lib/db';
 import {
     Plus, Save, RefreshCw, HelpCircle, CheckCircle2, XCircle,
-    Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter,
-    ArrowUp, ArrowDown
+    Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    rectSortingStrategy
+} from '@dnd-kit/sortable';
+import { SortableSystemCard } from './SortableSystemCard';
 
 interface SystemsManagementViewProps {
     onBack: () => void;
 }
 
 export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ onBack }) => {
-    const { data: systems, loading, error, refresh } = useQuery('SELECT * FROM systems ORDER BY sort_order ASC, name ASC');
+    const { data: systems, loading, refresh } = useQuery('SELECT * FROM systems ORDER BY sort_order ASC, name ASC');
     const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
     const [isScanning, setIsScanning] = React.useState(false);
@@ -21,6 +36,17 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('All');
     const [newSystem, setNewSystem] = React.useState({ name: '', url: '', category: 'IT' });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const filteredSystems = systems?.filter((s: any) => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -65,22 +91,22 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         refresh();
     };
 
-    const handleMove = async (id: number, currentOrder: number, direction: 'up' | 'down') => {
-        if (!systems) return;
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
 
-        const sorted = [...systems].sort((a, b) => a.sort_order - b.sort_order);
-        const currentIndex = sorted.findIndex(s => s.id === id);
-        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (over && active.id !== over.id && systems) {
+            const oldIndex = systems.findIndex((s: any) => s.id.toString() === active.id);
+            const newIndex = systems.findIndex((s: any) => s.id.toString() === over.id);
 
-        if (targetIndex < 0 || targetIndex >= sorted.length) return;
+            const newSystems = arrayMove(systems, oldIndex, newIndex);
 
-        const targetSystem = sorted[targetIndex];
+            // Update all sort_orders in DB
+            for (let i = 0; i < newSystems.length; i++) {
+                await runQuery('UPDATE systems SET sort_order = ? WHERE id = ?', [i, newSystems[i].id]);
+            }
 
-        // Swap sort_order
-        await runQuery('UPDATE systems SET sort_order = ? WHERE id = ?', [targetSystem.sort_order, id]);
-        await runQuery('UPDATE systems SET sort_order = ? WHERE id = ?', [currentOrder, targetSystem.id]);
-
-        refresh();
+            refresh();
+        }
     };
 
     const handleToggleFavorite = async (id: number, current: number) => {
@@ -198,84 +224,94 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
             </div>
 
             {/* Systems Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-bold">Loading Infrastructure Data...</div>
-                ) : filteredSystems?.map((system: any) => (
-                    <div
-                        key={system.id}
-                        className={`group relative p-6 bg-white dark:bg-slate-900 rounded-[32px] border transition-all duration-300 ${scanningId === system.id ? 'border-blue-400 ring-4 ring-blue-50' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl'}`}
-                    >
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl shadow-sm">
-                                {getStatusIcon(system.status, scanningId === system.id)}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="flex flex-col gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => handleMove(system.id, system.sort_order, 'up')}
-                                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-400 hover:text-blue-600 transition-all"
-                                        title="Move Up"
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {loading ? (
+                        <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-bold">Loading Infrastructure Data...</div>
+                    ) : (
+                        <SortableContext
+                            items={filteredSystems?.map((s: any) => s.id.toString()) || []}
+                            strategy={rectSortingStrategy}
+                        >
+                            {filteredSystems?.map((system: any) => (
+                                <SortableSystemCard key={system.id} id={system.id}>
+                                    <div
+                                        className={`h-full group relative p-6 bg-white dark:bg-slate-900 rounded-[32px] border transition-all duration-300 flex flex-col gap-4 ${scanningId === system.id ? 'border-blue-400 ring-4 ring-blue-50' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl'}`}
                                     >
-                                        <ArrowUp className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleMove(system.id, system.sort_order, 'down')}
-                                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-400 hover:text-blue-600 transition-all"
-                                        title="Move Down"
-                                    >
-                                        <ArrowDown className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={() => handleToggleFavorite(system.id, system.is_favorite)}
-                                    className={`p-2 rounded-xl transition-all ${system.is_favorite ? 'bg-amber-50 text-amber-500' : 'bg-slate-50 text-slate-300 hover:text-slate-400'}`}
-                                    title={system.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-                                >
-                                    <Star className={`w-5 h-5 ${system.is_favorite ? 'fill-current' : ''}`} />
-                                </button>
-                                {system.url && (
-                                    <a
-                                        href={system.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-500 rounded-xl transition-all"
-                                    >
-                                        <ExternalLink className="w-5 h-5" />
-                                    </a>
-                                )}
-                            </div>
-                        </div>
+                                        {/* Header Section: Category and Actions */}
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                {system.category && (
+                                                    <span className="text-[9px] font-black px-2 py-0.5 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 rounded-lg uppercase flex items-center gap-1.5 whitespace-nowrap border border-slate-100 dark:border-slate-700/30">
+                                                        {getCategoryIcon(system.category)}
+                                                        {system.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 z-10">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleFavorite(system.id, system.is_favorite);
+                                                    }}
+                                                    className={`p-2 rounded-xl transition-all relative z-20 ${system.is_favorite ? 'bg-amber-50 text-amber-500 shadow-sm shadow-amber-200/50' : 'bg-slate-50 dark:bg-slate-800 text-slate-300 hover:text-slate-400'}`}
+                                                    title={system.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                                                >
+                                                    <Star className={`w-3.5 h-3.5 ${system.is_favorite ? 'fill-current' : ''}`} />
+                                                </button>
+                                                {system.url && (
+                                                    <a
+                                                        href={system.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-2 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-500 rounded-xl transition-all relative z-20"
+                                                    >
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                                    {system.name}
-                                </h3>
-                                {system.category && (
-                                    <span className="text-[10px] font-black px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg uppercase flex items-center gap-1.5">
-                                        {getCategoryIcon(system.category)}
-                                        {system.category}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-slate-400 font-mono truncate">{system.url || 'No URL configured'}</p>
-                        </div>
+                                        {/* Body Section: Name and URL */}
+                                        <div className="space-y-1.5 flex-1">
+                                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors break-words leading-tight">
+                                                {system.name}
+                                            </h3>
+                                            <p className="text-[11px] text-slate-400 font-mono truncate max-w-full opacity-60 group-hover:opacity-100 transition-opacity">
+                                                {system.url || 'No URL configured'}
+                                            </p>
+                                        </div>
 
-                        <div className="mt-6 flex items-center gap-3">
-                            <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest ${system.status === 'online' ? 'bg-emerald-50 text-emerald-600' : system.status === 'offline' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
-                                {scanningId === system.id ? 'VERIFYING...' : (system.status || 'UNKNOWN')}
-                            </div>
-                            {system.status === 'online' && (
-                                <div className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-pulse">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    LIVE
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+                                        {/* Footer Section: Status Line */}
+                                        <div className="pt-4 border-t border-slate-50 dark:border-slate-800/50 flex items-center justify-between mt-auto">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                                    {getStatusIcon(system.status, scanningId === system.id)}
+                                                </div>
+                                                <span className={`text-[10px] font-bold uppercase tracking-widest ${system.status === 'online' ? 'text-emerald-600' : system.status === 'offline' ? 'text-red-500' : 'text-slate-400'}`}>
+                                                    {scanningId === system.id ? 'VERIFYING...' : (system.status || 'UNKNOWN')}
+                                                </span>
+                                            </div>
+
+                                            {system.status === 'online' && (
+                                                <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">LIVE</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </SortableSystemCard>
+                            ))}
+                        </SortableContext>
+                    )}
+                </div>
+            </DndContext>
 
             {/* Add Modal */}
             <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Register New System">

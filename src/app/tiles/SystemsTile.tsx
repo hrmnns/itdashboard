@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ExternalLink, CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
+import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
 
 interface SystemsTileProps {
     onNavigate: (view: any) => void;
@@ -34,13 +34,6 @@ export const SystemsTile: React.FC<SystemsTileProps> = ({ onNavigate }) => {
             className="flex flex-col h-full overflow-hidden cursor-pointer group/tile relative"
             onClick={() => onNavigate('systems-management')}
         >
-            {/* Tile Overlay on Hover */}
-            <div className="absolute inset-0 bg-blue-600/0 group-hover/tile:bg-blue-600/5 transition-colors z-10 rounded-2xl flex items-center justify-center pointer-events-none">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-xl shadow-xl opacity-0 translate-y-2 group-hover/tile:opacity-100 group-hover/tile:translate-y-0 transition-all font-bold text-xs text-blue-600 flex items-center gap-2">
-                    Manage All Systems
-                    <ExternalLink className="w-3 h-3" />
-                </div>
-            </div>
 
             <div className="flex-1 space-y-2 pr-1 overflow-hidden pointer-events-none">
                 {systems && systems.length > 0 ? (

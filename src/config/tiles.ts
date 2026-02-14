@@ -27,4 +27,11 @@ export const TILES: TileConfig[] = [
         component: 'ClockTile',
         defaultSize: 'small',
     },
+    {
+        id: 'data-inspector',
+        title: 'Data Inspector',
+        component: 'DataInspectorTile',
+        targetView: 'data-inspector',
+        defaultSize: 'small',
+    },
 ];

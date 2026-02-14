@@ -54,6 +54,17 @@ export const Shell: React.FC = () => {
         }
     }, [theme]);
 
+    // Sync state if new tiles are added to the configuration
+    React.useEffect(() => {
+        const allTileIds = TILES.map(t => t.id);
+        const newTiles = allTileIds.filter(id => !tileOrder.includes(id));
+
+        if (newTiles.length > 0) {
+            setTileOrder(prev => [...prev, ...newTiles]);
+            setVisibleTileIds(prev => [...new Set([...prev, ...newTiles])]);
+        }
+    }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds]);
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
             {/* Sidebar */}
@@ -179,21 +190,6 @@ export const Shell: React.FC = () => {
                                 <ExcelImport onImportComplete={() => setCurrentView('dashboard')} />
                             </div>
 
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Inspection</h3>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h4 className="font-medium text-slate-900 dark:text-white">Data Inspector</h4>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">View raw database records to verify imports.</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setCurrentView('data-inspector')}
-                                        className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition-colors"
-                                    >
-                                        Open Inspector
-                                    </button>
-                                </div>
-                            </div>
 
                             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
                                 <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Backup & Restore</h3>
@@ -402,7 +398,7 @@ export const Shell: React.FC = () => {
 
                     {currentView === 'data-inspector' && (
                         <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <DataInspector onBack={() => setCurrentView('datasource')} />
+                            <DataInspector onBack={() => setCurrentView('dashboard')} />
                         </div>
                     )}
 
