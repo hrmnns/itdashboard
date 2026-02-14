@@ -1,0 +1,16 @@
+const T=`CREATE TABLE IF NOT EXISTS kpi_data (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  unit TEXT,
+  category TEXT,
+  date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS operations_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  timestamp TEXT NOT NULL
+);
+`;export{T as default};
