@@ -17,6 +17,13 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
+  define: {
+    '__APP_VERSION__': JSON.stringify(process.env.npm_package_version),
+    '__BUILD_DATE__': JSON.stringify(new Date().toLocaleString('de-DE', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    })),
+  },
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm'],
   },

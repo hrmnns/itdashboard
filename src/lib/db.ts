@@ -1,144 +1,85 @@
-import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+import DBWorker from './db.worker?worker';
 
-let db: any = null;
-let initPromise: Promise<any> | null = null;
+const worker = new DBWorker();
+let initPromise: Promise<void> | null = null;
+let msgId = 0;
+const pending = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
 
-export async function initDB() {
-    if (db) return db;
-    if (initPromise) return initPromise;
+worker.onmessage = (e) => {
+    const { id, result, error } = e.data;
+    if (pending.has(id)) {
+        const { resolve, reject } = pending.get(id)!;
+        pending.delete(id);
+        if (error) reject(new Error(error));
+        else resolve(result);
+    }
+};
 
-    initPromise = (async () => {
-        try {
-            if (!window.crossOriginIsolated) {
-                console.warn('Cross-origin isolation is not enabled. OPFS will not be available. Please check COOP/COEP headers.');
-            }
+function send<T>(type: string, payload?: any): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const id = ++msgId;
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, type, payload });
+    });
+}
 
-            // Type assertion to bypass incorrect type definition if necessary
-            const config = {
-                print: console.log,
-                printErr: console.error,
-                locateFile: (file: string) => {
-                    if (file === 'sqlite3.wasm') {
-                        return '/sqlite3.wasm';
-                    }
-                    return file;
-                }
-            };
-
-            const sqlite3 = await (sqlite3InitModule as any)(config);
-
-            // Check if OpfsDb is available
-            if (sqlite3.oo1.OpfsDb) {
-                try {
-                    const opfsDb = new sqlite3.oo1.OpfsDb('/itdashboard.sqlite3');
-                    db = opfsDb;
-                    console.log('SQLite WASM initialized with OPFS');
-                } catch (opfsErr) {
-                    console.warn('Failed to initialize OPFS, falling back to in-memory.', opfsErr);
-                    db = new sqlite3.oo1.DB(':memory:');
-                    await initSchema();
-                    await loadDemoData();
-                }
-            } else {
-                console.warn('OpfsDb not available in this environment. Falling back to in-memory DB.');
-                db = new sqlite3.oo1.DB(':memory:');
-                await initSchema();
-                await loadDemoData();
-                console.log('SQLite WASM initialized in-memory');
-            }
-
-            return db;
-        } catch (err: any) {
-            console.error('Failed to initialize SQLite WASM', err);
-
-            // Final fallback if everything above fails
-            try {
-                const sqlite3 = await (sqlite3InitModule as any)();
-                db = new sqlite3.oo1.DB(':memory:');
-                console.warn('Forced fallback to in-memory DB due to error');
-                await initSchema();
-                await loadDemoData();
-                return db;
-            } catch (fallbackErr) {
-                console.error('Critical failure: could not even initialize in-memory DB', fallbackErr);
-                throw err;
-            }
-        } finally {
-            initPromise = null;
-        }
-    })();
-
+export function initDB() {
+    if (!initPromise) {
+        initPromise = send<boolean>('INIT').then(() => { });
+    }
     return initPromise;
 }
 
-export function getDB() {
-    if (!db) throw new Error('Database not initialized');
-    return db;
+export async function runQuery(sql: string, bind?: any[]): Promise<any[]> {
+    await initDB();
+    return send<any[]>('EXEC', { sql, bind });
 }
 
-export function runQuery(sql: string, bind?: any[]) {
-    const db = getDB();
-    const result: any[] = [];
-    db.exec({
-        sql,
-        bind,
-        rowMode: 'object',
-        callback: (row: any) => {
-            result.push(row);
-        },
-    });
-    return result;
+export async function bulkInsertInvoiceItems(data: any[]) {
+    await initDB();
+    return send('BULK_INSERT_INVOICE_ITEMS', data);
+}
+
+export async function bulkInsertKPIs(data: any[]) {
+    await initDB();
+    return send('BULK_INSERT_KPIS', data);
+}
+
+export async function bulkInsertEvents(data: any[]) {
+    await initDB();
+    return send('BULK_INSERT_EVENTS', data);
+}
+
+export async function clearDatabase() {
+    await initDB();
+    return send('CLEAR');
+}
+
+export async function exportDatabase(): Promise<Uint8Array> {
+    await initDB();
+    return send<Uint8Array>('EXPORT');
+}
+
+export async function importDatabase(buffer: ArrayBuffer) {
+    // No need to await initDB here as we might be overwriting a broken one
+    await send('IMPORT', buffer);
+    // Force re-init on next call
+    initPromise = null;
+}
+
+export async function loadDemoData() {
+    await initDB();
+    // Re-use clear for now or add specific LOAD_DEMOType
+    // Actually simpler to just use specific messages if we want granular control
+    // But for now let's just use INIT with a forced flag or similar? 
+    // Wait, the worker automatically loads demo data on INIT if empty.
+    // But the user might want to force reload.
+    // Let's add explicit LOAD_DEMO support in worker first or just rely on CLEAR then INIT?
+    // Let's check worker code.
+    return send('LOAD_DEMO');
 }
 
 export async function initSchema() {
-    const schema = await import('../datasets/schema.sql?raw').then(m => m.default);
-    const views = await import('../datasets/views.sql?raw').then(m => m.default);
-
-    const db = getDB();
-    db.exec(schema);
-    db.exec(views);
-    console.log('Schema and views initialized');
-}
-
-export async function loadDemoData(type: 'small' | 'large' = 'small') {
-    const db = getDB();
-
-    // Clear existing data
-    db.exec('DELETE FROM kpi_data; DELETE FROM operations_events;');
-
-    let data: any;
-    if (type === 'small') {
-        data = await import('../datasets/demo-small.json').then(m => m.default);
-    } else {
-        console.warn('Large dataset not implemented yet, using small');
-        data = await import('../datasets/demo-small.json').then(m => m.default);
-    }
-
-    // Insert KPIs
-    const kpiStmt = db.prepare('INSERT INTO kpi_data (metric, value, unit, category, date) VALUES (?, ?, ?, ?, ?)');
-    try {
-        for (const item of data.kpis) {
-            kpiStmt.bind([item.metric, item.value, item.unit, item.category, item.date]);
-            kpiStmt.step();
-            kpiStmt.reset();
-        }
-    } finally {
-        kpiStmt.finalize();
-    }
-
-    // Insert Events
-    if (data.events) {
-        const eventStmt = db.prepare('INSERT INTO operations_events (event_name, status, timestamp) VALUES (?, ?, ?)');
-        try {
-            for (const item of data.events) {
-                eventStmt.bind([item.event_name, item.status, item.timestamp]);
-                eventStmt.step();
-                eventStmt.reset();
-            }
-        } finally {
-            eventStmt.finalize();
-        }
-    }
-
-    console.log(`Loaded ${type} demo data`);
+    await initDB();
+    return send('INIT_SCHEMA');
 }

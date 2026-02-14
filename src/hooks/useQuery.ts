@@ -22,7 +22,7 @@ export function useQuery<T = any>(query: string, params: any[] = []) {
                 // await initSchema(); 
                 // We probably should initialize schema at app start, not here.
 
-                const result = runQuery(query, params);
+                const result = await runQuery(query, params);
                 if (mounted) {
                     setData(result);
                     setError(null);
