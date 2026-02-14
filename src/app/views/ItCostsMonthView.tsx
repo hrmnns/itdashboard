@@ -74,10 +74,39 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
 
             invoice.items.forEach((currentItem: any) => {
                 // Check if this item (Description + Category) existed last month for this vendor
-                const matchIndex = prevVendorItems.findIndex((p: any) =>
-                    p.Description === currentItem.Description &&
-                    p.Category === currentItem.Category
+                // Normalize description by removing numbers/dates for comparison. Handle nulls safely.
+                const normalize = (s: string | null | undefined) => (s || '').replace(/\d+/g, '#').trim();
+
+                // PRIORITY 1: Match by DocumentId + LineId + CostCenter (for unique recurring identification)
+                let matchIndex = prevVendorItems.findIndex((p: any) =>
+                    String(p.DocumentId).trim() === String(currentItem.DocumentId).trim() &&
+                    String(p.LineId).trim() === String(currentItem.LineId).trim() &&
+                    String(p.CostCenter).trim() === String(currentItem.CostCenter).trim()
                 );
+
+                // PRIORITY 2: If no strict Document match, Fallback to Description + Category (for new invoices/vendors)
+                if (matchIndex === -1) {
+                    matchIndex = prevVendorItems.findIndex((p: any) =>
+                        normalize(p.Description) === normalize(currentItem.Description) &&
+                        p.Category === currentItem.Category
+                    );
+                }
+
+                if (String(invoice.DocumentId).trim() === '4000000921') {
+                    // Use a more robust way to group logs once per invoice group
+                    if (!(window as any)._loggedThisRender) (window as any)._loggedThisRender = new Set();
+                    if (!(window as any)._loggedThisRender.has(invoice.DocumentId)) {
+                        console.group(`🔍 Debugging Anomaly in MONTH VIEW: ${invoice.DocumentId}`);
+                        (window as any)._loggedThisRender.add(invoice.DocumentId);
+                        // Clean up set after a bit so it logs on next render
+                        setTimeout(() => (window as any)._loggedThisRender?.delete(invoice.DocumentId), 1000);
+                    }
+
+                    const match = matchIndex !== -1 ? prevVendorItems[matchIndex] : null;
+                    console.log(`Item #${currentItem.LineId}: ${currentItem.Description}`);
+                    console.log(`  - Match Found: ${matchIndex !== -1 ? 'YES' : 'NO'}`);
+                    if (match) console.log(`  - Prev Amount: ${match.Amount}, Current Amount: ${currentItem.Amount}`);
+                }
 
                 if (matchIndex === -1) {
                     newItemsCount++;
@@ -88,16 +117,25 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
                     const percentDiff = diff / Math.abs(match.Amount || 1);
                     if (diff > 10 && percentDiff > 0.1) {
                         amountChangedCount++;
+                        if (String(invoice.DocumentId).trim() === '4000000921') {
+                            console.log(`  - RESULT: CHANGED (Diff: ${diff}, %: ${Math.round(percentDiff * 100)}%)`);
+                        }
+                    } else if (String(invoice.DocumentId).trim() === '4000000921') {
+                        console.log(`  - RESULT: STABLE`);
                     }
                 }
             });
+
+            if (String(invoice.DocumentId).trim() === '4000000921') {
+                console.groupEnd();
+            }
 
             return { ...invoice, newItemsCount, amountChangedCount };
         }).sort((a, b) => b.PostingDate.localeCompare(a.PostingDate));
     })();
 
     const totalAmount = invoices.reduce((acc, inv) => acc + inv.total_amount, 0);
-    const vendorCount = new Set(invoices.map(inv => inv.VendorId)).size;
+    const vendorCount = new Set(invoices.map(inv => inv.VendorId || inv.VendorName)).size;
     const totalAnomalies = invoices.reduce((acc, inv) => acc + inv.newItemsCount + inv.amountChangedCount, 0);
 
     const columns: Column<any>[] = [

@@ -25,17 +25,18 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
     // Fetch all positions for this specific invoice
-    const { data: currentItemsData, loading: loadingCurrent, error } = useQuery(`
-        SELECT * FROM invoice_items 
-        WHERE DocumentId = '${invoiceId}'
-        ORDER BY LineId ASC
-    `);
+    const { data: currentItemsData, loading: loadingCurrent, error } = useQuery(
+        `SELECT * FROM invoice_items WHERE DocumentId = ? AND Period = ? ORDER BY LineId ASC`,
+        [invoiceId, period]
+    );
 
     // Fetch previous month items for this vendor to compare
     const vendorId = currentItemsData?.[0]?.VendorId;
-    const { data: previousItemsData, loading: loadingPrevious } = useQuery(
-        vendorId ? `SELECT * FROM invoice_items WHERE Period = '${previousPeriod}' AND VendorId = '${vendorId}'` : ''
-    );
+    // Ensure we only query if vendorId exists
+    const prevQuery = vendorId ? `SELECT * FROM invoice_items WHERE Period = ? AND VendorId = ?` : '';
+    const prevParams = vendorId ? [previousPeriod, vendorId] : [];
+
+    const { data: previousItemsData, loading: loadingPrevious } = useQuery(prevQuery, prevParams);
 
     if (loadingCurrent || loadingPrevious) return (
         <div className="flex items-center justify-center h-64">
@@ -52,11 +53,36 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     const postingDate = items[0]?.PostingDate || period;
 
     // Enhance items with anomaly flags
+    const normalize = (s: string | null | undefined) => (s || '').replace(/\d+/g, '#').trim();
+
+    // Debug: Always show which invoice we are looking at
+    console.log(`[ItCostsInvoiceItemsView] Rendering for ID: "${invoiceId}" (type: ${typeof invoiceId})`);
+
+    const isTargetInvoice = String(invoiceId).trim() === '4000000921';
+
+    if (isTargetInvoice) {
+        console.group(`🔍 Debugging Anomaly for Invoice: ${invoiceId}`);
+        console.log(`Current items:`, items.length);
+        console.log(`Previous month items available for comparison:`, previousItems.length);
+    }
+
     const enhancedItems = items.map((item: any) => {
-        const match = previousItems.find((p: any) =>
-            p.Description === item.Description &&
-            p.Category === item.Category
+        // PRIORITY 1: Match by DocumentId + LineId + CostCenter (for unique recurring identification)
+        let match = previousItems.find((p: any) =>
+            String(p.DocumentId).trim() === String(item.DocumentId).trim() &&
+            String(p.LineId).trim() === String(item.LineId).trim() &&
+            String(p.CostCenter).trim() === String(item.CostCenter).trim()
         );
+        let matchType = match ? 'Priority 1 (DocId+LineId)' : 'None';
+
+        // PRIORITY 2: Fallback to Description + Category
+        if (!match) {
+            match = previousItems.find((p: any) =>
+                normalize(p.Description) === normalize(item.Description) &&
+                p.Category === item.Category
+            );
+            if (match) matchType = 'Priority 2 (Fuzzy Description)';
+        }
 
         let status: 'normal' | 'new' | 'changed' = 'normal';
         let previousAmount = null;
@@ -72,8 +98,18 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             }
         }
 
+        if (isTargetInvoice) {
+            console.log(`Item #${item.LineId}: ${item.Description}`);
+            console.log(`  - Match: ${matchType}`, match ? `(Amt: ${match.Amount})` : '');
+            console.log(`  - Result: ${status}`);
+        }
+
         return { ...item, status, previousAmount };
     });
+
+    if (isTargetInvoice) {
+        console.groupEnd();
+    }
 
     const columns: Column<any>[] = [
         {

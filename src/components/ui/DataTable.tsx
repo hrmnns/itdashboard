@@ -15,6 +15,7 @@ interface DataTableProps<T> {
     searchTerm?: string;
     searchFields?: (keyof T)[];
     emptyMessage?: string;
+    onRowClick?: (item: T) => void;
 }
 
 export function DataTable<T>({
@@ -22,7 +23,8 @@ export function DataTable<T>({
     columns,
     searchTerm = '',
     searchFields = [],
-    emptyMessage = 'No items found'
+    emptyMessage = 'No items found',
+    onRowClick
 }: DataTableProps<T>) {
 
     const filteredData = useMemo(() => {
@@ -53,7 +55,11 @@ export function DataTable<T>({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {filteredData.map((item, rowIndex) => (
-                        <tr key={rowIndex} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
+                        <tr
+                            key={rowIndex}
+                            onClick={() => onRowClick && onRowClick(item)}
+                            className={`transition-colors group ${onRowClick ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
+                        >
                             {columns.map((col, colIndex) => {
                                 const value = typeof col.accessor === 'function'
                                     ? col.accessor(item)

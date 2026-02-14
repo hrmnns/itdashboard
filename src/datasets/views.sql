@@ -1,5 +1,5 @@
-DROP VIEW IF EXISTS latest_kpis;
-CREATE VIEW latest_kpis AS
+DROP VIEW IF EXISTS kpi_history;
+CREATE VIEW kpi_history AS
 WITH aggregated_invoice_costs AS (
     SELECT 
         'IT Costs' as metric, 
@@ -15,8 +15,18 @@ combined_kpis AS (
     UNION ALL
     SELECT metric, value, unit, category, date FROM aggregated_invoice_costs
 )
-SELECT metric, value, unit, category, date
+SELECT 
+    metric, 
+    SUM(value) as value, 
+    MAX(unit) as unit, 
+    MAX(category) as category, 
+    date
 FROM combined_kpis
+GROUP BY metric, date;
+
+DROP VIEW IF EXISTS latest_kpis;
+CREATE VIEW latest_kpis AS
+SELECT * FROM kpi_history
 GROUP BY metric
 ORDER BY date DESC;
 
@@ -25,7 +35,7 @@ DROP VIEW IF EXISTS it_costs_summary;
 CREATE VIEW it_costs_summary AS
 SELECT 
     SUM(Amount) as total_amount,
-    COUNT(DISTINCT VendorId) as active_vendors,
+    COUNT(DISTINCT COALESCE(NULLIF(VendorId, ''), VendorName)) as active_vendors,
     MAX(PostingDate) as latest_date,
     MAX(FiscalYear) as latest_year,
     'EUR' as unit

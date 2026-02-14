@@ -6,28 +6,27 @@ interface ItCostsTileProps {
     onNavigate?: (view: any) => void;
 }
 
-export const ItCostsTile: React.FC<ItCostsTileProps> = ({ onNavigate }) => {
+export const ItCostsTile: React.FC<ItCostsTileProps> = () => {
     // 1. Fetch aggregates
     const { data: summaryData, loading: summaryLoading, error: summaryError } = useQuery("SELECT * FROM it_costs_summary");
     // 2. Fetch history for trend (last 4 months)
-    const { data: trendData, loading: trendLoading } = useQuery("SELECT * FROM latest_kpis WHERE metric = 'IT Costs' ORDER BY date DESC LIMIT 4");
+    const { data: trendData, loading: trendLoading } = useQuery("SELECT * FROM kpi_history WHERE metric = 'IT Costs' ORDER BY date DESC LIMIT 4");
 
     if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
     if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
 
     const summary = summaryData?.[0] || { total_amount: 0, active_vendors: 0, latest_date: 'N/A', latest_year: 'N/A' };
 
-    // Trend calculation
+    // Trend calculation: Comparison between latest month and previous month (MoM)
     let trendPercent = 0;
     let isTrendUp = false;
     if (trendData && trendData.length >= 2) {
         const latest = trendData[0].value;
-        const previousThree = trendData.slice(1);
-        const avgPrevious = previousThree.reduce((acc: number, r: any) => acc + r.value, 0) / previousThree.length;
+        const previous = trendData[1].value;
 
-        if (avgPrevious > 0) {
-            trendPercent = ((latest - avgPrevious) / avgPrevious) * 100;
-            isTrendUp = latest > avgPrevious;
+        if (previous > 0) {
+            trendPercent = ((latest - previous) / previous) * 100;
+            isTrendUp = latest > previous;
         }
     }
 
@@ -57,29 +56,74 @@ export const ItCostsTile: React.FC<ItCostsTileProps> = ({ onNavigate }) => {
             </div>
 
             {/* Trend Indicator Section */}
-            <div className="flex-1 flex flex-col justify-center items-center bg-white dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Cost Trend (vs. last 3m avg)</div>
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${isTrendUp ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
-                        {isTrendUp ? <ArrowUpRight className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6 rotate-90" />}
-                    </div>
-                    <div>
-                        <div className={`text-2xl font-bold ${isTrendUp ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {isTrendUp ? '+' : ''}{trendPercent.toFixed(1)}%
+            <div className="flex-1 flex flex-col justify-center bg-white dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 p-4 relative overflow-hidden">
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Cost Trend (vs. previous month)</div>
+
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isTrendUp ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                            {isTrendUp ? <ArrowUpRight className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6 rotate-90" />}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-medium">
-                            Latest: €{trendData?.[0]?.value?.toLocaleString()}
+                        <div>
+                            <div className={`text-2xl font-bold ${isTrendUp ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {isTrendUp ? '+' : ''}{trendPercent.toFixed(1)}%
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">
+                                Latest: €{trendData?.[0]?.value?.toLocaleString()}
+                            </div>
                         </div>
                     </div>
+
+                    {/* Sparkline */}
+                    {trendData && trendData.length >= 2 && (
+                        <div className="w-24 h-12 flex items-end">
+                            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
+                                {(() => {
+                                    const points = [...trendData].reverse();
+                                    const min = Math.min(...points.map(p => p.value));
+                                    const max = Math.max(...points.map(p => p.value));
+                                    const range = max - min || 1;
+
+                                    // Calculate path
+                                    const coords = points.map((p, i) => {
+                                        const x = (i / (points.length - 1)) * 100;
+                                        const y = 40 - ((p.value - min) / range) * 30 - 5; // 5px padding
+                                        return `${x},${y}`;
+                                    });
+
+                                    return (
+                                        <>
+                                            <path
+                                                d={`M ${coords.join(' L ')}`}
+                                                fill="none"
+                                                stroke={isTrendUp ? '#ef4444' : '#10b981'}
+                                                strokeWidth="2.5"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                            <path
+                                                d={`M ${coords.join(' L ')} L 100,40 L 0,40 Z`}
+                                                fill={`url(#gradient-${isTrendUp ? 'red' : 'green'})`}
+                                                opacity="0.2"
+                                            />
+                                            <defs>
+                                                <linearGradient id="gradient-red" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#ef4444" />
+                                                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+                                                </linearGradient>
+                                                <linearGradient id="gradient-green" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#10b981" />
+                                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                        </>
+                                    );
+                                })()}
+                            </svg>
+                        </div>
+                    )}
                 </div>
             </div>
-
-            <button
-                onClick={() => onNavigate?.('it-costs-year')}
-                className="w-full py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors border border-dashed border-slate-200 dark:border-slate-700 rounded-lg hover:border-blue-400"
-            >
-                View Detailed Cost Analysis
-            </button>
         </div>
     );
 };

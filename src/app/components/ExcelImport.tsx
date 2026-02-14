@@ -6,7 +6,9 @@ import { Upload, Check, AlertCircle } from 'lucide-react';
 import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 import { ColumnMapper } from './ColumnMapper';
+import type { MappingConfig } from './ColumnMapper';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { applyTransform } from '../../lib/transformers';
 
 const ajv = new Ajv2020({ allErrors: true, useDefaults: true });
 addFormats(ajv);
@@ -24,12 +26,11 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
 
     // Mapping State
     const [mapperOpen, setMapperOpen] = useState(false);
-    // pendingRawData and pendingSheetName removed as they were unused
     const [pendingFileColumns, setPendingFileColumns] = useState<string[]>([]);
     const [workbookCache, setWorkbookCache] = useState<XLSX.WorkBook | null>(null);
 
-    // Persisted Mappings: Key = SourceColumns.sort().join('|') -> Value = MappingObject
-    const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, string>>>('excel_mappings', {});
+    // Persisted Mappings: Key = SourceColumns.sort().join('|') -> Value = MappingConfig
+    const [savedMappings, setSavedMappings] = useLocalStorage<Record<string, Record<string, MappingConfig>>>('excel_mappings_v2', {});
 
     const requiredFields = invoiceItemsSchema.items.required || [];
 
@@ -67,10 +68,11 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
         }
     };
 
-    const processWorkbook = async (workbook: XLSX.WorkBook, manualMapping?: Record<string, string>) => {
+    const processWorkbook = async (workbook: XLSX.WorkBook, manualMapping?: Record<string, MappingConfig>) => {
         let kpis: any[] = [];
         let events: any[] = [];
         let invoiceItems: any[] = [];
+        let invoiceItemsSheetName = '';
 
         // 1. Identify Sheets
         workbook.SheetNames.forEach(sheetName => {
@@ -86,24 +88,22 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
                 events = convertDates(rawData);
             } else if (lowerName.includes('invoice') || lowerName.includes('cost') || lowerName.includes('spend') || invoiceItems.length === 0) {
                 // This is our candidate for Invoice Items
-                // Only process one candidate for now to avoid confusion
                 if (invoiceItems.length === 0) {
-                    invoiceItems = rawData; // Keep raw for now
+                    invoiceItems = rawData;
+                    invoiceItemsSheetName = sheetName;
                 }
             }
         });
 
         // 2. Check Mapping for Invoice Items
-        if (invoiceItems.length > 0) {
-            const firstRow = invoiceItems[0];
-            const columns = Object.keys(firstRow);
-            const missingRequired = requiredFields.filter(field => !columns.includes(field));
+        if (invoiceItems.length > 0 && invoiceItemsSheetName) {
+            // Robustly get headers from the sheet directly
+            // Object.keys(row[0]) fails if the first row has empty cells for some columns
+            const sheet = workbook.Sheets[invoiceItemsSheetName];
+            const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[];
+            const columns = (headerRow || []).filter(h => h && typeof h === 'string'); // Filter valid headers
 
-            // Logic:
-            // A. If manualMapping provided -> apply it
-            // B. If no missing required fields -> proceed as standard
-            // C. If missing fields -> check saved mappings -> apply if found
-            // D. Else -> trigger Mapper UI
+            const missingRequired = requiredFields.filter(field => !columns.includes(field));
 
             let finalData = invoiceItems;
 
@@ -125,7 +125,63 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
                 }
             }
 
-            // Convert dates on finalized data
+            // Enrich Data (FiscalYear) & Standardize
+            finalData = finalData.map((row, index) => {
+                // Robust Period Parsing (e.g. 01.2025 -> 2025-01)
+                // This handles cases where transformer wasn't selected manually
+                if (row.Period && typeof row.Period === 'string') {
+                    const pMatch = row.Period.match(/^(\d{1,2})[.-](\d{4})$/);
+                    if (pMatch) {
+                        row.Period = `${pMatch[2]}-${parseInt(pMatch[1], 10).toString().padStart(2, '0')}`;
+                    }
+                }
+
+                // Ensure FiscalYear exists and is integer
+                let fiscalYear = row.FiscalYear;
+                if (fiscalYear) {
+                    fiscalYear = typeof fiscalYear === 'string' ? parseInt(fiscalYear, 10) : fiscalYear;
+                }
+
+                if (!fiscalYear || isNaN(fiscalYear)) {
+                    if (row.Period && typeof row.Period === 'string' && row.Period.match(/^\d{4}-\d{2}$/)) {
+                        fiscalYear = parseInt(row.Period.split('-')[0], 10);
+                    } else if (row.PostingDate && typeof row.PostingDate === 'string' && row.PostingDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        fiscalYear = parseInt(row.PostingDate.split('-')[0], 10);
+                    } else {
+                        fiscalYear = new Date().getFullYear();
+                    }
+                }
+
+                // Ensure LineId exists (default to 1-based index)
+                let lineId = row.LineId;
+                if (!lineId) {
+                    lineId = index + 1;
+                } else {
+                    lineId = typeof lineId === 'string' ? parseInt(lineId, 10) : lineId;
+                }
+
+                // Ensure DocumentId exists
+                let documentId = row.DocumentId;
+                if (!documentId) {
+                    documentId = 'GEN-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                }
+
+                // Ensure PostingDate exists (derive from Period if missing)
+                // Critical for correct sorting in charts
+                let postingDate = row.PostingDate;
+                if (!postingDate && row.Period && row.Period.match(/^\d{4}-\d{2}$/)) {
+                    postingDate = `${row.Period}-01`;
+                }
+
+                return {
+                    ...row,
+                    FiscalYear: fiscalYear,
+                    LineId: lineId,
+                    DocumentId: documentId,
+                    PostingDate: postingDate // Override or set
+                };
+            });
+
             invoiceItems = convertDates(finalData);
         }
 
@@ -145,28 +201,66 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
         });
     };
 
-    const applyMapping = (data: any[], mapping: Record<string, string>) => {
+    const applyMapping = (data: any[], mapping: Record<string, MappingConfig>) => {
         return data.map(row => {
             const newRow: any = {};
-            // 1. Copy over fields that already match standard keys (optional overlap)
+
+            // 1. Copy unmapped fields (preserve extra data)
+            const mappedSources = Object.values(mapping).map(m => m.sourceColumn);
             Object.keys(row).forEach(key => {
-                if (!Object.values(mapping).includes(key)) {
-                    // heuristic: keep property if it matches a schema key that wasn't mapped?
-                    // Safe bet: just copy everything, but mapped keys take precedence if conflict?
-                    // Actually, we usually construct ONLY the target schema.
-                    // But we might want to keep extra props.
+                if (!mappedSources.includes(key)) {
                     newRow[key] = row[key];
                 }
             });
 
-            // 2. Apply mapping
-            Object.entries(mapping).forEach(([target, source]) => {
-                if (row[source] !== undefined) {
-                    newRow[target] = row[source];
+            // 2. Apply mapping & transformation
+            Object.entries(mapping).forEach(([targetField, config]) => {
+                if (config.sourceColumn === '__CONSTANT__') {
+                    // Prefer constantValue, fallback to transformId for backward compat (legacy Currency)
+                    if (config.constantValue) {
+                        newRow[targetField] = config.constantValue;
+                    } else if (config.transformId) {
+                        // Legacy support: if we still have a transformId for a constant (e.g. old EUR)
+                        newRow[targetField] = applyTransform(null, config.transformId, targetField);
+                    }
+                } else {
+                    const sourceValue = row[config.sourceColumn];
+                    if (sourceValue !== undefined) {
+                        let finalValue = sourceValue;
+
+                        if (config.transformId) {
+                            finalValue = applyTransform(sourceValue, config.transformId, targetField);
+                        }
+
+                        newRow[targetField] = finalValue;
+                    }
                 }
             });
+
             return newRow;
         });
+    };
+
+    const handleMappingConfirm = async (mapping: Record<string, MappingConfig>) => {
+        setMapperOpen(false);
+        setIsImporting(true);
+        setMessage('Applying mapping...');
+
+        // Save mapping
+        const mappingKey = [...pendingFileColumns].sort().join('|');
+        setSavedMappings(prev => ({ ...prev, [mappingKey]: mapping }));
+
+        // Resume process
+        if (workbookCache) {
+            await processWorkbook(workbookCache, mapping);
+        }
+    };
+
+    const handleResetMappings = () => {
+        if (window.confirm('Are you sure you want to clear all saved column mappings? You will need to re-map your files.')) {
+            setSavedMappings({});
+            setMessage('Mappings cleared.');
+        }
     };
 
     const performImport = async (invoiceItems: any[], kpis: any[], events: any[]) => {
@@ -185,7 +279,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
         }
 
         try {
-            await clearDatabase();
+            await clearDatabase(); // Optional: Clearing DB before import? Assumption: Re-import replaces all.
 
             if (invoiceItems.length > 0) await bulkInsertInvoiceItems(invoiceItems);
             if (kpis.length > 0) await bulkInsertKPIs(kpis);
@@ -201,28 +295,6 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             setMessage(`Import failed: ${err.message}`);
         } finally {
             setIsImporting(false);
-        }
-    };
-
-    const handleMappingConfirm = async (mapping: Record<string, string>) => {
-        setMapperOpen(false);
-        setIsImporting(true);
-        setMessage('Applying mapping...');
-
-        // Save mapping
-        const mappingKey = [...pendingFileColumns].sort().join('|');
-        setSavedMappings(prev => ({ ...prev, [mappingKey]: mapping }));
-
-        // Resume process
-        if (workbookCache) {
-            // We need to re-run processWorkbook but FORCE the mapping for the pending sheet
-            // Actually, processWorkbook logic is "if manualMapping... apply it".
-            // But processWorkbook iterates all sheets. 
-            // Simplification: We know we paused at 'pendingSheetName'.
-            // We can just call applyMapping here and then performImport.
-            // But we need the KPIs and Events from the workbook again.
-            // Easier to just call processWorkbook with the manual mapping.
-            await processWorkbook(workbookCache, mapping);
         }
     };
 
@@ -268,6 +340,15 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
                         </p>
                     </div>
                 </label>
+            </div>
+
+            <div className="flex justify-end">
+                <button
+                    onClick={handleResetMappings}
+                    className="text-xs text-slate-400 hover:text-red-500 transition-colors underline"
+                >
+                    Reset Saved Mappings
+                </button>
             </div>
 
             {status !== 'idle' && (

@@ -7,15 +7,12 @@
     "minItems": 1,
     "items": {
         "type": "object",
-        "additionalProperties": false,
+        "additionalProperties": true,
         "required": [
-            "FiscalYear",
             "Period",
             "PostingDate",
-            "DocumentId",
             "LineId",
-            "Amount",
-            "Currency"
+            "Amount"
         ],
         "anyOf": [
             {
@@ -38,8 +35,8 @@
             },
             "Period": {
                 "type": "string",
-                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
-                "description": "Accounting period (month key) in format YYYY-MM, e.g. 2026-10."
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-3])$",
+                "description": "Accounting period (month key) in format YYYY-MM, e.g. 2026-10 or 2026-13."
             },
             "PostingDate": {
                 "type": "string",
@@ -123,8 +120,7 @@
             },
             "Quantity": {
                 "type": "number",
-                "minimum": 0,
-                "description": "Quantity for unit-based charging (optional)."
+                "description": "Quantity for unit-based charging (optional). Can be negative for corrections."
             },
             "Unit": {
                 "type": "string",

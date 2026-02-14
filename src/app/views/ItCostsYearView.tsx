@@ -18,7 +18,7 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
         FROM invoice_items
         GROUP BY Period
         ORDER BY date DESC
-        LIMIT 12
+        LIMIT 15
     `);
 
     if (loading) return (
@@ -45,7 +45,7 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                 </button>
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">IT Costs Analysis</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Monthly breakdown for the last 12 reported periods</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Monthly breakdown for the last 15 reported periods</p>
                 </div>
             </div>
 
@@ -87,7 +87,7 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                 <div className="flex items-center justify-between mb-8">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Calendar className="w-5 h-5 text-indigo-500" />
-                        Cost Development (12 Months)
+                        Cost Development (Recent Periods)
                     </h3>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
@@ -110,8 +110,8 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                             <div className="relative w-full flex flex-col items-center group">
                                 <div
                                     className={`w-full max-w-[40px] rounded-t-lg transition-all duration-500 hover:brightness-110 shadow-lg ${d.total < 0
-                                            ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-700 dark:to-emerald-500 shadow-emerald-500/10'
-                                            : 'bg-gradient-to-t from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 shadow-blue-500/10'
+                                        ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-700 dark:to-emerald-500 shadow-emerald-500/10'
+                                        : 'bg-gradient-to-t from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 shadow-blue-500/10'
                                         }`}
                                     style={{ height: `${(Math.abs(d.total) / maxVal) * 250}px` }}
                                 >

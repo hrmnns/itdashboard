@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Calendar, TrendingUp, AlertCircle, Info, Tag, Layers } from 'lucide-react';
+import { ArrowLeft, Calendar, TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
+import { DataTable } from '../../components/ui/DataTable';
+import { Modal } from '../components/Modal';
 
 interface ItCostsItemHistoryViewProps {
     vendorId: string;
@@ -9,15 +11,22 @@ interface ItCostsItemHistoryViewProps {
 }
 
 export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ vendorId, description, onBack }) => {
+    const [selectedItem, setSelectedItem] = useState<any>(null);
     // Fetch history for this item (same Vendor + Description)
-    // Escape single quotes in description for SQL
-    const safeDescription = description.replace(/'/g, "''");
+    // Fetch history for this item (same Vendor + Description)
 
-    const { data, loading, error } = useQuery(`
-        SELECT * FROM invoice_items 
-        WHERE VendorId = '${vendorId}' AND Description = '${safeDescription}'
-        ORDER BY PostingDate ASC
-    `);
+    // Use parameters to avoid escaping issues
+    // Try LIKE if description contains dates (basic heuristic)
+    const hasDigits = /\d/.test(description);
+    const sql = hasDigits
+        ? `SELECT * FROM invoice_items WHERE VendorId = ? AND Description LIKE ? ORDER BY PostingDate ASC`
+        : `SELECT * FROM invoice_items WHERE VendorId = ? AND Description = ? ORDER BY PostingDate ASC`;
+
+    const searchParam = hasDigits
+        ? description.replace(/\d+/g, '%')
+        : description;
+
+    const { data, loading, error } = useQuery(sql, [vendorId, searchParam]);
 
     const history = data || [];
     const isRecurring = history.length > 1;
@@ -165,15 +174,32 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                         <h3 className="text-sm font-bold uppercase text-slate-500 tracking-wider mb-4 flex items-center gap-2">
                             <Info className="w-4 h-4" />
-                            Item Details
+                            Latest Details
                         </h3>
 
                         <div className="space-y-4">
                             <div>
+                                <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">Document Reference</div>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <Receipt className="w-4 h-4 text-slate-400" />
+                                        <span className="font-mono text-sm font-bold">{latestOccurrence?.DocumentId || '<missing>'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 pl-6">
+                                        <span className="text-xs text-slate-500">Line #{latestOccurrence?.LineId ?? '?'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-slate-100 dark:bg-slate-700" />
+
+                            <div>
                                 <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">Latest Category</div>
                                 <div className="flex items-center gap-2">
                                     <Tag className="w-4 h-4 text-slate-400" />
-                                    <span className="font-medium">{latestOccurrence?.Category}</span>
+                                    <span className={`font-medium ${!latestOccurrence?.Category ? 'text-slate-400 italic' : ''}`}>
+                                        {latestOccurrence?.Category || '<empty>'}
+                                    </span>
                                 </div>
                             </div>
 
@@ -183,8 +209,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                 <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">Cost Center</div>
                                 <div className="flex items-center gap-2">
                                     <Layers className="w-4 h-4 text-slate-400" />
-                                    <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-sm">
-                                        {latestOccurrence?.CostCenter}
+                                    <span className={`font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-sm ${!latestOccurrence?.CostCenter ? 'text-slate-400 italic' : ''}`}>
+                                        {latestOccurrence?.CostCenter || '<empty>'}
                                     </span>
                                 </div>
                             </div>
@@ -193,16 +219,24 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
                             <div>
                                 <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">G/L Account</div>
-                                <div className="font-mono text-sm">{latestOccurrence?.GLAccount}</div>
+                                <div className={`font-mono text-sm ${!latestOccurrence?.GLAccount ? 'text-slate-400 italic' : ''}`}>
+                                    {latestOccurrence?.GLAccount || '<empty>'}
+                                </div>
                             </div>
 
                             <div className="h-px bg-slate-100 dark:bg-slate-700" />
 
                             <div>
-                                <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">First Seen</div>
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-slate-400" />
-                                    <span>{firstOccurrence?.Period}</span>
+                                <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">First vs Latest</div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <div className="text-slate-400">First Seen</div>
+                                        <div className="font-medium">{firstOccurrence?.Period}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-slate-400">Latest</div>
+                                        <div className="font-medium">{latestOccurrence?.Period}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -219,6 +253,78 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                     </div>
                 </div>
             </div>
+
+            {/* Detailed History Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-slate-500" />
+                        Transaction History
+                    </h3>
+                </div>
+                <DataTable
+                    data={[...history].reverse()} // Show newest first
+                    columns={[
+                        {
+                            header: 'Date',
+                            accessor: 'PostingDate',
+                            render: (item: any) => (
+                                <span className="font-mono text-sm">{item.PostingDate}</span>
+                            )
+                        },
+                        {
+                            header: 'Period',
+                            accessor: 'Period',
+                            render: (item: any) => (
+                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-xs font-bold">{item.Period}</span>
+                            )
+                        },
+                        {
+                            header: 'Document ID',
+                            accessor: 'DocumentId',
+                            render: (item: any) => (
+                                <span className="font-mono text-xs text-slate-500">{item.DocumentId}</span>
+                            )
+                        },
+                        {
+                            header: 'Amount',
+                            accessor: 'Amount',
+                            align: 'right',
+                            render: (item: any) => (
+                                <span className={`font-bold ${item.Amount < 0 ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
+                                    €{item.Amount.toLocaleString()}
+                                </span>
+                            )
+                        }
+                    ]}
+                    onRowClick={(item) => setSelectedItem(item)}
+                    emptyMessage="No history found"
+                />
+            </div>
+
+            {/* Slide-over / Modal for details */}
+            <Modal
+                isOpen={!!selectedItem}
+                onClose={() => setSelectedItem(null)}
+                title="Transaction Details"
+            >
+                {selectedItem ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                        {Object.entries(selectedItem).map(([key, value]) => (
+                            <div key={key} className="border-b border-slate-100 dark:border-slate-700 pb-2">
+                                <dt className="text-[10px] font-bold uppercase text-slate-400 mb-1">{key}</dt>
+                                <dd className="text-sm font-medium text-slate-900 dark:text-white break-all">
+                                    {value === null || value === undefined || value === '' ? (
+                                        <span className="text-slate-300 italic">&lt;empty&gt;</span>
+                                    ) : (
+                                        String(value)
+                                    )}
+                                </dd>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </Modal>
         </div>
     );
 };

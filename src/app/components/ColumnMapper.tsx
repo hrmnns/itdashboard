@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Save, Wand2, AlertCircle } from 'lucide-react';
+import { ArrowRight, Save, Wand2, AlertCircle, Settings2 } from 'lucide-react';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
+import { transformers } from '../../lib/transformers';
+
+export interface MappingConfig {
+    sourceColumn: string;
+    transformId?: string;
+    constantValue?: string;
+}
 
 interface ColumnMapperProps {
     sourceColumns: string[];
-    onConfirm: (mapping: Record<string, string>) => void;
+    onConfirm: (mapping: Record<string, MappingConfig>) => void;
     onCancel: () => void;
-    initialMapping?: Record<string, string>;
+    initialMapping?: Record<string, MappingConfig>;
 }
 
 export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onConfirm, onCancel, initialMapping }) => {
-    const [mapping, setMapping] = useState<Record<string, string>>(initialMapping || {});
+    const [mapping, setMapping] = useState<Record<string, MappingConfig>>(initialMapping || {});
 
     // Extract target fields from schema
-    // We only map top-level properties of items
     const schemaProperties = invoiceItemsSchema.items.properties;
     const requiredFields = invoiceItemsSchema.items.required || [];
 
@@ -25,43 +31,53 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
     }));
 
     const handleAutoMap = () => {
-        const newMapping: Record<string, string> = {};
+        const newMapping: Record<string, MappingConfig> = {};
         targetFields.forEach(field => {
-            // update this logic to be smarter if needed (fuzzy match etc)
             const match = sourceColumns.find(col =>
                 col.toLowerCase() === field.key.toLowerCase() ||
                 col.toLowerCase().replace(/[^a-z0-9]/g, '') === field.key.toLowerCase().replace(/[^a-z0-9]/g, '')
             );
             if (match) {
-                newMapping[field.key] = match;
+                newMapping[field.key] = { sourceColumn: match };
             }
         });
         setMapping(prev => ({ ...prev, ...newMapping }));
     };
 
-    // Auto-map on load if no initial mapping
     useEffect(() => {
         if (!initialMapping || Object.keys(initialMapping).length === 0) {
             handleAutoMap();
         }
-    }, []);
+    }, [initialMapping]);
 
     const isValid = targetFields
         .filter(f => f.required)
-        .every(f => mapping[f.key]);
+        .every(f => {
+            const m = mapping[f.key];
+            if (!m) return false;
+            // If Constant, must have a constantValue
+            if (m.sourceColumn === '__CONSTANT__') return !!m.constantValue;
+            return !!m.sourceColumn;
+        });
 
     const getUnmappedRequiredCount = () => {
-        return targetFields.filter(f => f.required && !mapping[f.key]).length;
+        return targetFields.filter(f => {
+            if (!f.required) return false;
+            const m = mapping[f.key];
+            if (!m) return true;
+            if (m.sourceColumn === '__CONSTANT__') return !m.constantValue;
+            return !m.sourceColumn;
+        }).length;
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Map Columns</h2>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Map Columns & Transforms</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Match columns from your file to the required data fields.
+                            Match columns and apply necessary format conversions.
                         </p>
                     </div>
                     <button
@@ -74,67 +90,139 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({ sourceColumns, onCon
                 </div>
 
                 <div className="flex-1 overflow-auto p-6">
-                    <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-[1fr,auto,1fr,1fr] gap-4 items-start mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
                         <div>Required Field</div>
                         <div className="w-8"></div>
                         <div>Your File Column</div>
+                        <div>Transformation</div>
                     </div>
 
                     <div className="space-y-3">
-                        {targetFields.map((field) => (
-                            <div key={field.key} className={`
-                                grid grid-cols-[1fr,auto,1fr] gap-4 items-center p-4 rounded-xl border transition-colors
-                                ${mapping[field.key]
-                                    ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700'
-                                    : field.required
-                                        ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100'
-                                }
-                            `}>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`font-semibold ${field.required ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                                            {field.key}
-                                        </span>
-                                        {field.required && (
-                                            <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-bold uppercase">Required</span>
+                        {targetFields.map((field) => {
+                            const availableTransforms = transformers[field.key] || [];
+                            const currentMapping = mapping[field.key];
+
+                            return (
+                                <div key={field.key} className={`
+                                    grid grid-cols-[1fr,auto,1fr,1fr] gap-4 items-center p-4 rounded-xl border transition-colors
+                                    ${currentMapping?.sourceColumn
+                                        ? 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-700'
+                                        : field.required
+                                            ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
+                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100'
+                                    }
+                                `}>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`font-semibold ${field.required ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                {field.key}
+                                            </span>
+                                            {field.required && (
+                                                <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-bold uppercase">Required</span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1 line-clamp-1" title={field.description}>
+                                            {field.description}
+                                        </div>
+                                    </div>
+
+                                    <ArrowRight className={`w-4 h-4 ${currentMapping?.sourceColumn ? 'text-blue-500' : 'text-slate-300'}`} />
+
+                                    <select
+                                        value={currentMapping?.sourceColumn || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setMapping(prev => {
+                                                const next = { ...prev };
+                                                if (val) {
+                                                    // If switching to constant, auto-select first available transform if possible
+                                                    let initialTransform = next[field.key]?.transformId;
+                                                    if (val === '__CONSTANT__' && !initialTransform && availableTransforms.length > 0) {
+                                                        initialTransform = availableTransforms[0].id;
+                                                    }
+
+                                                    next[field.key] = {
+                                                        sourceColumn: val,
+                                                        transformId: initialTransform
+                                                    };
+                                                } else {
+                                                    delete next[field.key];
+                                                }
+                                                return next;
+                                            });
+                                        }}
+                                        className={`
+                                            w-full p-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
+                                            ${currentMapping?.sourceColumn
+                                                ? 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
+                                                : 'border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'
+                                            }
+                                        `}
+                                    >
+                                        <option value="">-- Ignored --</option>
+                                        <option value="__CONSTANT__" className="font-bold text-blue-600">-- Set Constant Value --</option>
+                                        <optgroup label="Source Columns">
+                                            {sourceColumns.map(col => (
+                                                <option key={col} value={col}>
+                                                    {col}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    </select>
+
+                                    {/* Transformation or Constant Input */}
+                                    <div>
+                                        {currentMapping?.sourceColumn === '__CONSTANT__' ? (
+                                            <div className="relative animate-in fade-in zoom-in-95">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter constant value..."
+                                                    value={currentMapping.constantValue || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setMapping(prev => ({
+                                                            ...prev,
+                                                            [field.key]: { ...prev[field.key]!, constantValue: val }
+                                                        }));
+                                                    }}
+                                                    className={`
+                                                        w-full p-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
+                                                        ${!currentMapping.constantValue
+                                                            ? 'border-red-300 ring-2 ring-red-100 bg-red-50'
+                                                            : 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
+                                                        }
+                                                    `}
+                                                />
+                                            </div>
+                                        ) : (
+                                            (availableTransforms.length > 0) && (currentMapping?.sourceColumn || field.key === 'Currency') && (
+                                                <div className="relative">
+                                                    <Settings2 className="absolute left-2 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                                                    <select
+                                                        value={currentMapping?.transformId || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setMapping(prev => ({
+                                                                ...prev,
+                                                                [field.key]: { ...prev[field.key]!, transformId: val || undefined }
+                                                            }));
+                                                        }}
+                                                        className="w-full pl-8 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        <option value="">No Transformation</option>
+                                                        {availableTransforms.map(t => (
+                                                            <option key={t.id} value={t.id}>
+                                                                {t.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )
                                         )}
                                     </div>
-                                    <div className="text-xs text-slate-500 mt-1 line-clamp-1" title={field.description}>
-                                        {field.description}
-                                    </div>
                                 </div>
-
-                                <ArrowRight className={`w-4 h-4 ${mapping[field.key] ? 'text-blue-500' : 'text-slate-300'}`} />
-
-                                <select
-                                    value={mapping[field.key] || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setMapping(prev => {
-                                            const next = { ...prev };
-                                            if (val) next[field.key] = val;
-                                            else delete next[field.key];
-                                            return next;
-                                        });
-                                    }}
-                                    className={`
-                                        w-full p-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all
-                                        ${mapping[field.key]
-                                            ? 'border-blue-200 bg-white dark:bg-slate-900 dark:border-blue-900/50'
-                                            : 'border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'
-                                        }
-                                    `}
-                                >
-                                    <option value="">-- Select Column --</option>
-                                    {sourceColumns.map(col => (
-                                        <option key={col} value={col}>
-                                            {col}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 

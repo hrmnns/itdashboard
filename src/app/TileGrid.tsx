@@ -3,6 +3,12 @@ import { TILES } from '../config/tiles';
 import { getTileComponent } from './registry';
 import { Card } from '../components/ui/Card';
 import type { TileSize } from '../types';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs));
+}
 
 const getSizeClass = (size: TileSize) => {
     switch (size) {
@@ -31,9 +37,15 @@ export const TileGrid: React.FC<TileGridProps> = ({ onNavigate }) => {
                     <Card
                         key={tile.id}
                         title={tile.title}
-                        className={getSizeClass(tile.defaultSize)}
+                        className={cn(
+                            getSizeClass(tile.defaultSize),
+                            tile.targetView && "cursor-pointer hover:shadow-md hover:shadow-blue-500/10 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all duration-300 group"
+                        )}
+                        onClick={() => tile.targetView && onNavigate(tile.targetView)}
                     >
-                        <Component onNavigate={onNavigate} />
+                        <div className={cn(tile.targetView && "group-hover:scale-[1.01] transition-transform duration-300 h-full")}>
+                            <Component onNavigate={onNavigate} />
+                        </div>
                     </Card>
                 );
             })}

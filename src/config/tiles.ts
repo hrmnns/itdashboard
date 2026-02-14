@@ -5,6 +5,7 @@ export const TILES: TileConfig[] = [
         id: 'it-costs',
         title: 'IT Kosten',
         component: 'ItCostsTile',
+        targetView: 'it-costs-year',
         defaultSize: 'medium',
     },
     {

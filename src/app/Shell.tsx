@@ -8,13 +8,14 @@ import { ItCostsYearView } from './views/ItCostsYearView';
 import { ItCostsMonthView } from './views/ItCostsMonthView';
 import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
 import { ItCostsItemHistoryView } from './views/ItCostsItemHistoryView';
+import { DataInspector } from './views/DataInspector';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
 
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [selectedItemParams, setSelectedItemParams] = useState<{ vendorId: string; description: string } | null>(null);
@@ -166,6 +167,22 @@ export const Shell: React.FC = () => {
                             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
                                 <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Import Data</h3>
                                 <ExcelImport onImportComplete={() => setCurrentView('dashboard')} />
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Inspection</h3>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="font-medium text-slate-900 dark:text-white">Data Inspector</h4>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">View raw database records to verify imports.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setCurrentView('data-inspector')}
+                                        className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-500 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg transition-colors"
+                                    >
+                                        Open Inspector
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
@@ -328,6 +345,12 @@ export const Shell: React.FC = () => {
                                 description={selectedItemParams.description}
                                 onBack={() => setCurrentView('it-costs-invoice')}
                             />
+                        </div>
+                    )}
+
+                    {currentView === 'data-inspector' && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <DataInspector onBack={() => setCurrentView('datasource')} />
                         </div>
                     )}
                 </div>
