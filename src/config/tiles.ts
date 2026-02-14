@@ -9,9 +9,22 @@ export const TILES: TileConfig[] = [
         defaultSize: 'medium',
     },
     {
-        id: 'operations',
-        title: 'Operations Status',
-        component: 'OperationsTile',
+        id: 'systems',
+        title: 'Systems Availability',
+        component: 'SystemsTile',
+        targetView: 'systems-management',
+        defaultSize: 'medium',
+    },
+    {
+        id: 'it-forecast',
+        title: 'Budget Forecast',
+        component: 'ItForecastTile',
+        defaultSize: 'medium',
+    },
+    {
+        id: 'clock',
+        title: 'Status & Time',
+        component: 'ClockTile',
         defaultSize: 'small',
     },
 ];

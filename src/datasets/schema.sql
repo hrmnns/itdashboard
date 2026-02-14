@@ -41,3 +41,13 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   Description TEXT,
   SourceTag TEXT
 );
+ 
+CREATE TABLE IF NOT EXISTS systems (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT,
+  status TEXT DEFAULT 'unknown',
+  category TEXT,
+  is_favorite INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0
+);

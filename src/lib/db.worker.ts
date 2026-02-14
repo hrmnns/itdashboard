@@ -37,6 +37,34 @@ async function initDB() {
         // Initialize schema
         db.exec(schemaSql);
         db.exec(viewsSql);
+
+        // Migration: Add is_favorite to systems if it doesn't exist
+        try {
+            const columns: string[] = [];
+            db.exec({
+                sql: "PRAGMA table_info(systems)",
+                rowMode: 'object',
+                callback: (row: any) => columns.push(row.name)
+            });
+
+            if (columns.length > 0) {
+                if (!columns.includes('is_favorite')) {
+                    log('Migrating systems table: adding is_favorite column');
+                    db.exec("ALTER TABLE systems ADD COLUMN is_favorite INTEGER DEFAULT 0");
+                    db.exec("UPDATE systems SET is_favorite = 1 WHERE id IN (SELECT id FROM systems LIMIT 4)");
+                }
+
+                if (!columns.includes('sort_order')) {
+                    log('Migrating systems table: adding sort_order column');
+                    db.exec("ALTER TABLE systems ADD COLUMN sort_order INTEGER DEFAULT 0");
+                    // Initialize sort_order with id to maintain current order
+                    db.exec("UPDATE systems SET sort_order = id");
+                }
+            }
+        } catch (e) {
+            error('Migration failed', e);
+        }
+
         log('Schema initialized');
 
         // Check for empty DB and load demo data
@@ -87,6 +115,26 @@ async function loadDemoData() {
             eventStmt.finalize();
         }
     }
+
+    // Systems
+    if (demoDataSmall.systems) {
+        const systemStmt = db.prepare('INSERT INTO systems (name, url, status, category, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+        try {
+            db.exec('BEGIN TRANSACTION');
+            let count = 0;
+            for (const item of demoDataSmall.systems) {
+                // Set first 4 as favorites by default
+                const isFavorite = count < 4 ? 1 : 0;
+                systemStmt.bind([item.name, item.url, item.status, item.category, isFavorite, count]);
+                systemStmt.step();
+                systemStmt.reset();
+                count++;
+            }
+            db.exec('COMMIT');
+        } finally {
+            systemStmt.finalize();
+        }
+    }
     log('Demo data loaded');
 }
 
@@ -129,6 +177,12 @@ async function handleMessage(e: MessageEvent) {
             case 'BULK_INSERT_EVENTS':
                 if (!db) await initDB();
                 insertEvents(payload);
+                result = true;
+                break;
+
+            case 'BULK_INSERT_SYSTEMS':
+                if (!db) await initDB();
+                insertSystems(payload);
                 result = true;
                 break;
 
@@ -225,6 +279,24 @@ function insertEvents(data: any[]) {
         db.exec('BEGIN TRANSACTION');
         for (const item of data) {
             stmt.bind([item.event_name, item.status, item.timestamp]);
+            stmt.step();
+            stmt.reset();
+        }
+        db.exec('COMMIT');
+    } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+    } finally {
+        stmt.finalize();
+    }
+}
+
+function insertSystems(data: any[]) {
+    const stmt = db.prepare('INSERT INTO systems (name, url, status, category, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+    try {
+        db.exec('BEGIN TRANSACTION');
+        for (const item of data) {
+            stmt.bind([item.name, item.url, item.status, item.category, item.is_favorite || 0, item.sort_order || 0]);
             stmt.step();
             stmt.reset();
         }

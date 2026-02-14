@@ -9,19 +9,23 @@ import { ItCostsMonthView } from './views/ItCostsMonthView';
 import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
 import { ItCostsItemHistoryView } from './views/ItCostsItemHistoryView';
 import { DataInspector } from './views/DataInspector';
+import { SystemsManagementView } from './views/SystemsManagementView';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
+import { TILES } from '../config/tiles';
 
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector' | 'systems-management'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [selectedItemParams, setSelectedItemParams] = useState<{ vendorId: string; description: string } | null>(null);
 
-    // Theme Management with Persistence
+    // Theme & Customization Management
     const [theme, setTheme] = useLocalStorage<'light' | 'dark' | 'system'>('theme', 'system');
+    const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
+    const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', TILES.map(t => t.id));
 
     React.useEffect(() => {
         const root = window.document.documentElement;
@@ -54,10 +58,10 @@ export const Shell: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
             {/* Sidebar */}
             <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-transform duration-200 ease-in-out
-        md:relative md:translate-x-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+                fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-transform duration-200 ease-in-out
+                md:relative md:translate-x-0
+                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between md:flex-col md:items-start md:gap-2">
                     <div className="flex items-center gap-2.5">
                         <div className="p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
@@ -119,7 +123,13 @@ export const Shell: React.FC = () => {
                 <div className="flex-1 overflow-auto">
                     {currentView === 'dashboard' && (
                         <div className="animate-in fade-in duration-500">
-                            <TileGrid onNavigate={(view: any) => setCurrentView(view)} />
+                            <TileGrid
+                                onNavigate={(view: any) => setCurrentView(view)}
+                                visibleTileIds={visibleTileIds}
+                                tileOrder={tileOrder}
+                                onOrderChange={setTileOrder}
+                                onRemoveTile={(id) => setVisibleTileIds(visibleTileIds.filter(v => v !== id))}
+                            />
                         </div>
                     )}
 
@@ -250,7 +260,8 @@ export const Shell: React.FC = () => {
                         <div className="p-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
                             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
 
-                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                            {/* Appearance Section */}
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
                                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                     <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
                                         {theme === 'light' ? '🌞' : theme === 'dark' ? '🌚' : '💻'}
@@ -293,6 +304,47 @@ export const Shell: React.FC = () => {
                                             <span className="text-xl">💻</span>
                                             <span className="text-sm font-medium">System</span>
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dashboard Customization Section */}
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                        🧩
+                                    </span>
+                                    Dashboard Customization
+                                </h3>
+                                <div className="space-y-4">
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        Select which tiles you want to see on your dashboard.
+                                    </p>
+
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map(tile => (
+                                            <div
+                                                key={tile!.id}
+                                                className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (visibleTileIds.includes(tile!.id)) {
+                                                            setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
+                                                        } else {
+                                                            setVisibleTileIds([...visibleTileIds, tile!.id]);
+                                                        }
+                                                    }}
+                                                    className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -353,18 +405,22 @@ export const Shell: React.FC = () => {
                             <DataInspector onBack={() => setCurrentView('datasource')} />
                         </div>
                     )}
+
+                    {currentView === 'systems-management' && (
+                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <SystemsManagementView onBack={() => setCurrentView('dashboard')} />
+                        </div>
+                    )}
                 </div>
-            </main >
+            </main>
 
             {/* Overlay for mobile */}
-            {
-                sidebarOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
-                        onClick={() => setSidebarOpen(false)}
-                    />
-                )
-            }
-        </div >
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+        </div>
     );
 };
