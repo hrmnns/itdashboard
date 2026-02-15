@@ -33,7 +33,10 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const chartData = [...(data || [])].reverse();
+    const tableData = [...(data || [])].reverse();
+    // Exclude Period 13 from the chart to avoid visual anomalies
+    const chartData = tableData.filter(d => !d.Period.endsWith('-13'));
+
     const maxVal = Math.max(...chartData.map(d => d.total), 1);
     const avgVal = chartData.reduce((acc, d) => acc + d.total, 0) / (chartData.length || 1);
     const minVal = Math.min(...chartData.map(d => d.total));
@@ -96,9 +99,13 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                             {/* Bar */}
                             <div className="relative w-full flex flex-col items-center group">
                                 <div
-                                    className={`w-full max-w-[40px] rounded-t-lg transition-all duration-500 hover:brightness-110 shadow-lg ${d.total < 0
-                                        ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-700 dark:to-emerald-500 shadow-emerald-500/10'
-                                        : 'bg-gradient-to-t from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 shadow-blue-500/10'
+                                    className={`w-full max-w-[40px] rounded-t-lg transition-all duration-500 hover:brightness-110 shadow-lg ${d.total === maxVal
+                                        ? 'bg-gradient-to-t from-red-600 to-red-400 dark:from-red-700 dark:to-red-500 shadow-red-500/10'
+                                        : d.total === minVal
+                                            ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-700 dark:to-emerald-500 shadow-emerald-500/10'
+                                            : d.total < 0
+                                                ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 dark:from-emerald-700 dark:to-emerald-500 shadow-emerald-500/10'
+                                                : 'bg-gradient-to-t from-blue-600 to-blue-400 dark:from-blue-700 dark:to-blue-500 shadow-blue-500/10'
                                         }`}
                                     style={{ height: `${(Math.abs(d.total) / maxVal) * 250}px` }}
                                 >
@@ -128,6 +135,7 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-900/50">
                         <tr>
+                            <th className="px-6 py-3 w-16 text-center">Trend</th>
                             <th className="px-6 py-3">Month / Period</th>
                             <th className="px-6 py-3 text-center">Volume</th>
                             <th className="px-6 py-3">Data Quality</th>
@@ -136,8 +144,24 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {chartData.map((d, i) => (
+                        {tableData.map((d, i) => (
                             <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                <td className="px-6 py-4 text-center">
+                                    {d.total === maxVal && (
+                                        <div className="flex justify-center" title="Peak Month">
+                                            <div className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
+                                                <TrendingUp className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {d.total === minVal && (
+                                        <div className="flex justify-center" title="Lowest Month">
+                                            <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full">
+                                                <TrendingDown className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 font-medium">{d.Period}</td>
                                 <td className="px-6 py-4 text-center">
                                     <div className="flex flex-col items-center">

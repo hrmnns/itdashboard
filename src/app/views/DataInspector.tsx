@@ -172,10 +172,10 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 </div>
             </div>
 
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-auto">
+            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 overflow-hidden flex flex-col relative min-h-0">
                     {loading && !items ? (
-                        <div className="p-12 text-center text-slate-400 animate-pulse">
+                        <div className="flex-1 flex items-center justify-center p-12 text-center text-slate-400 animate-pulse">
                             Loading {selectedTable}...
                         </div>
                     ) : (

@@ -9,23 +9,25 @@ WITH aggregated_invoice_costs AS (
         CASE 
             WHEN Period LIKE '%-13' THEN date(MAX(PostingDate), '+1 day') 
             ELSE MAX(PostingDate) 
-        END as date
+        END as date,
+        Period as period
     FROM invoice_items
     GROUP BY Period
 ),
 combined_kpis AS (
-    SELECT metric, value, unit, category, date FROM kpi_data
+    SELECT metric, value, unit, category, date, strftime('%Y-%m', date) as period FROM kpi_data
     UNION ALL
-    SELECT metric, value, unit, category, date FROM aggregated_invoice_costs
+    SELECT metric, value, unit, category, date, period FROM aggregated_invoice_costs
 )
 SELECT 
     metric, 
     SUM(value) as value, 
     MAX(unit) as unit, 
     MAX(category) as category, 
-    date
+    date,
+    period
 FROM combined_kpis
-GROUP BY metric, date;
+GROUP BY metric, date, period;
 
 DROP VIEW IF EXISTS latest_kpis;
 CREATE VIEW latest_kpis AS
@@ -43,3 +45,51 @@ SELECT
     MAX(FiscalYear) as latest_year,
     'EUR' as unit
 FROM invoice_items;
+
+-- Anomaly Radar View
+DROP VIEW IF EXISTS view_anomalies;
+CREATE VIEW view_anomalies AS
+WITH ItemHistory AS (
+    SELECT 
+        *,
+        LAG(Amount) OVER (PARTITION BY VendorName, Description ORDER BY Period) as PrevAmount,
+        LAG(Period) OVER (PARTITION BY VendorName, Description ORDER BY Period) as PrevPeriod
+    FROM invoice_items
+),
+ScoredItems AS (
+    SELECT 
+        *,
+        -- 1. Drift Score: High deviation from previous amount
+        CASE 
+            WHEN PrevAmount IS NOT NULL AND Amount > PrevAmount * 1.2 AND (Amount - PrevAmount) > 500 THEN 50
+            WHEN PrevAmount IS NOT NULL AND Amount < PrevAmount * 0.8 AND (PrevAmount - Amount) > 500 THEN 20
+            ELSE 0 
+        END as ScoreDrift,
+        
+        -- 2. New Item Score: First time appearance
+        CASE 
+            WHEN PrevAmount IS NULL THEN 30 
+            ELSE 0 
+        END as ScoreNew,
+
+        -- 3. Quality Score: Synthetic IDs
+        CASE 
+            WHEN DocumentId LIKE 'GEN-%' THEN 25 
+            ELSE 0 
+        END as ScoreQuality,
+
+        -- 4. Value Score: Logarithmic scale of amount (cap at 50)
+        MIN(50, CAST((LOG10(MAX(ABS(Amount), 1)) * 10) AS INTEGER)) as ScoreValue
+    FROM ItemHistory
+)
+SELECT 
+    *,
+    (ScoreDrift + ScoreNew + ScoreQuality + ScoreValue) as RiskScore,
+    CASE
+        WHEN ScoreDrift > 0 THEN 'Cost Drift'
+        WHEN ScoreNew > 0 THEN 'New Item'
+        WHEN ScoreQuality > 0 THEN 'Data Quality'
+        ELSE 'Review'
+    END as AnomalyType
+FROM ScoredItems
+WHERE RiskScore > 40; -- Only significant anomalies

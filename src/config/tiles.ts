@@ -34,4 +34,11 @@ export const TILES: TileConfig[] = [
         targetView: 'data-inspector',
         defaultSize: 'small',
     },
+    {
+        id: 'anomaly-radar',
+        title: 'Anomaly Radar',
+        component: 'AnomalyRadarTile',
+        targetView: 'anomaly-detection',
+        defaultSize: 'medium',
+    },
 ];

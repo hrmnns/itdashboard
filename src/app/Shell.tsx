@@ -9,6 +9,8 @@ import { ItCostsYearView } from './views/ItCostsYearView';
 import { ItCostsMonthView } from './views/ItCostsMonthView';
 import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
 import { ItCostsItemHistoryView } from './views/ItCostsItemHistoryView';
+import { AnomalyDetectionView } from './views/AnomalyDetectionView';
+import { AnomalyDetailView } from './views/AnomalyDetailView';
 import { DataInspector } from './views/DataInspector';
 import { SystemsManagementView } from './views/SystemsManagementView';
 import invoiceItemsSchema from '../schemas/invoice-items-schema.json';
@@ -19,10 +21,13 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
-    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector' | 'systems-management'>('dashboard');
+    const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector' | 'systems-management' | 'anomaly-detection' | 'anomaly-detail'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
+
+    // Navigation History for non-linear flows
+    const [previousView, setPreviousView] = useState<string | null>(null);
 
     // Theme & Customization Management
     const [theme, setTheme] = useLocalStorage<'light' | 'dark' | 'system'>('theme', 'system');
@@ -106,7 +111,7 @@ export const Shell: React.FC = () => {
     }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds]);
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
+        <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
             {/* Sidebar */}
             <aside className={`
                 fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-all duration-300 ease-in-out
@@ -182,7 +187,7 @@ export const Shell: React.FC = () => {
                     <h1 className="text-lg font-bold">IT Dashboard</h1>
                 </header>
 
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 min-h-0 overflow-hidden relative">
                     {currentView === 'dashboard' && (
                         <div className="animate-in fade-in duration-500">
                             <TileGrid
@@ -471,7 +476,14 @@ export const Shell: React.FC = () => {
                                 <ItCostsInvoiceItemsView
                                     invoiceId={selectedInvoiceId}
                                     period={selectedPeriod || ''}
-                                    onBack={() => setCurrentView('it-costs-month')}
+                                    onBack={() => {
+                                        if (previousView === 'anomaly-detail') {
+                                            setCurrentView('anomaly-detail');
+                                            setPreviousView(null); // Clear history after using it
+                                        } else {
+                                            setCurrentView('it-costs-month');
+                                        }
+                                    }}
                                     onViewHistory={(item: any) => {
                                         setSelectedItem(item);
                                         setCurrentView('it-costs-item-history');
@@ -502,13 +514,48 @@ export const Shell: React.FC = () => {
 
                     {
                         currentView === 'systems-management' && (
-                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full overflow-y-auto p-6 md:p-8">
                                 <SystemsManagementView onBack={() => setCurrentView('dashboard')} />
                             </div>
                         )
                     }
-                </div >
-            </main >
+
+                    {
+                        currentView === 'anomaly-detection' && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full overflow-y-auto p-6 md:p-8">
+                                <AnomalyDetectionView
+                                    onBack={() => setCurrentView('dashboard')}
+                                    onDrillDown={(invoiceId: string, period?: string) => {
+                                        if (period) {
+                                            setSelectedInvoiceId(invoiceId);
+                                            setSelectedPeriod(period);
+                                            setCurrentView('anomaly-detail');
+                                        } else {
+                                            alert('Missing period context for anomaly detail.');
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )
+                    }
+
+                    {
+                        currentView === 'anomaly-detail' && selectedInvoiceId && selectedPeriod && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full overflow-y-auto p-6 md:p-8">
+                                <AnomalyDetailView
+                                    anomalyId={selectedInvoiceId}
+                                    period={selectedPeriod}
+                                    onBack={() => setCurrentView('anomaly-detection')}
+                                    onOpenInvoice={() => {
+                                        setPreviousView('anomaly-detail');
+                                        setCurrentView('it-costs-invoice');
+                                    }}
+                                />
+                            </div>
+                        )
+                    }
+                </div>
+            </main>
 
             {/* Overlay for mobile */}
             {

@@ -10,7 +10,7 @@ export const ItCostsTile: React.FC<ItCostsTileProps> = () => {
     // 1. Fetch aggregates
     const { data: summaryData, loading: summaryLoading, error: summaryError } = useQuery("SELECT * FROM it_costs_summary");
     // 2. Fetch history for trend (last 4 months)
-    const { data: trendData, loading: trendLoading } = useQuery("SELECT * FROM kpi_history WHERE metric = 'IT Costs' ORDER BY date DESC LIMIT 4");
+    const { data: trendData, loading: trendLoading } = useQuery("SELECT * FROM kpi_history WHERE metric = 'IT Costs' AND period NOT LIKE '%-13' ORDER BY date DESC LIMIT 4");
 
     if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
     if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
