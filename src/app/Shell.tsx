@@ -3,7 +3,7 @@ import { TileGrid } from './TileGrid';
 import { ExcelImport } from './components/ExcelImport';
 import { SchemaDocumentation } from './components/SchemaDocumentation';
 import { SystemStatus } from './components/SystemStatus';
-import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck, Bell, Save, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck, Bell, Save, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { runQuery } from '../lib/db';
 import { ItCostsYearView } from './views/ItCostsYearView';
 import { ItCostsMonthView } from './views/ItCostsMonthView';
@@ -18,6 +18,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export const Shell: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
     const [currentView, setCurrentView] = useState<'dashboard' | 'datasource' | 'settings' | 'it-costs-year' | 'it-costs-month' | 'it-costs-invoice' | 'it-costs-item-history' | 'data-inspector' | 'systems-management'>('dashboard');
     const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -108,24 +109,32 @@ export const Shell: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
             {/* Sidebar */}
             <aside className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-transform duration-200 ease-in-out
-                md:relative md:translate-x-0
-                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-all duration-300 ease-in-out
+                ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+                ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
             `}>
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between md:flex-col md:items-start md:gap-2">
-                    <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
+                <div className={`p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between ${isSidebarCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="flex-shrink-0 p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
                             <ShieldCheck className="w-5 h-5 text-white" />
                         </div>
-                        <div>
-                            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                        <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0' : 'opacity-100'}`}>
+                            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
                                 IT <span className="text-blue-600">Dashboard</span>
                             </h1>
-                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Analytics Platform</p>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest whitespace-nowrap">Analytics Platform</p>
                         </div>
                     </div>
                     <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 text-slate-500 hover:text-slate-700">
                         <Menu className="w-6 h-6" />
+                    </button>
+
+                    {/* PC Collapse Toggle */}
+                    <button
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full items-center justify-center shadow-md hover:text-blue-600 transition-colors z-50"
+                    >
+                        {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                     </button>
                 </div>
 
@@ -133,35 +142,38 @@ export const Shell: React.FC = () => {
                     <nav className="p-4 space-y-1">
                         <button
                             onClick={() => { setCurrentView('dashboard'); setSidebarOpen(false); }}
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${currentView === 'dashboard' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isSidebarCollapsed ? 'md:justify-center md:px-0' : ''} ${currentView === 'dashboard' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            title={isSidebarCollapsed ? 'Overview' : ''}
                         >
-                            <LayoutDashboard className="w-5 h-5" />
-                            Overview
+                            <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+                            <span className={`transition-all duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>Overview</span>
                         </button>
                         <button
                             onClick={() => { setCurrentView('datasource'); setSidebarOpen(false); }}
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${currentView === 'datasource' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isSidebarCollapsed ? 'md:justify-center md:px-0' : ''} ${currentView === 'datasource' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            title={isSidebarCollapsed ? 'Data Source' : ''}
                         >
-                            <Database className="w-5 h-5" />
-                            Data Source
+                            <Database className="w-5 h-5 flex-shrink-0" />
+                            <span className={`transition-all duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>Data Source</span>
                         </button>
                         <button
                             onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${currentView === 'settings' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${isSidebarCollapsed ? 'md:justify-center md:px-0' : ''} ${currentView === 'settings' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                            title={isSidebarCollapsed ? 'Settings' : ''}
                         >
-                            <Settings className="w-5 h-5" />
-                            Settings
+                            <Settings className="w-5 h-5 flex-shrink-0" />
+                            <span className={`transition-all duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 overflow-hidden' : 'opacity-100'}`}>Settings</span>
                         </button>
                     </nav>
 
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                        <SystemStatus />
+                    <div className={`p-4 border-t border-slate-200 dark:border-slate-700 transition-all ${isSidebarCollapsed ? 'md:p-2' : ''}`}>
+                        <SystemStatus isCollapsed={isSidebarCollapsed} />
                     </div>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <main className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                 {/* Mobile Header */}
                 <header className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4">
                     <button onClick={() => setSidebarOpen(true)} className="p-1 text-slate-500 hover:text-slate-700">

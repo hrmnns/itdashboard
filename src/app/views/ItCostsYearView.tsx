@@ -1,6 +1,7 @@
-import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar, Filter } from 'lucide-react';
+import { ViewHeader } from '../components/ui/ViewHeader';
+import { SummaryCard } from '../components/ui/SummaryCard';
+import { TrendingUp, TrendingDown, DollarSign, Calendar, Filter } from 'lucide-react';
 
 interface ItCostsYearViewProps {
     onBack: () => void;
@@ -14,10 +15,13 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
             Period, 
             SUM(Amount) as total,
             MAX(FiscalYear) as year,
-            MAX(PostingDate) as date
+            MAX(PostingDate) as date,
+            COUNT(DISTINCT DocumentId) as invoice_count,
+            COUNT(*) as item_count,
+            COUNT(DISTINCT CASE WHEN DocumentId LIKE 'GEN-%' THEN DocumentId END) as synthetic_invoices
         FROM invoice_items
         GROUP BY Period
-        ORDER BY date DESC
+        ORDER BY Period DESC
         LIMIT 15
     `);
 
@@ -32,55 +36,38 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
     const chartData = [...(data || [])].reverse();
     const maxVal = Math.max(...chartData.map(d => d.total), 1);
     const avgVal = chartData.reduce((acc, d) => acc + d.total, 0) / (chartData.length || 1);
+    const minVal = Math.min(...chartData.map(d => d.total));
 
     return (
         <div className="p-6 md:p-8 space-y-8">
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={onBack}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">IT Costs Analysis</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Monthly breakdown for the last 15 reported periods</p>
-                </div>
-            </div>
+            <ViewHeader
+                title="IT Costs Analysis"
+                subtitle="Monthly breakdown for the last 15 reported periods"
+                onBack={onBack}
+            />
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 mb-2">
-                        <DollarSign className="w-5 h-5" />
-                        <span className="text-sm font-bold uppercase tracking-wider">Average / Month</span>
-                    </div>
-                    <div className="text-3xl font-extrabold text-slate-900 dark:text-white text-right">
-                        €{Math.round(avgVal).toLocaleString()}
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400 mb-2">
-                        <TrendingDown className="w-5 h-5" />
-                        <span className="text-sm font-bold uppercase tracking-wider">Lowest Month</span>
-                    </div>
-                    <div className="text-3xl font-extrabold text-slate-900 dark:text-white text-right">
-                        €{Math.round(Math.min(...chartData.map(d => d.total))).toLocaleString()}
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-2">
-                        <TrendingUp className="w-5 h-5" />
-                        <span className="text-sm font-bold uppercase tracking-wider">Peak Month</span>
-                    </div>
-                    <div className="text-3xl font-extrabold text-slate-900 dark:text-white text-right">
-                        €{Math.round(maxVal).toLocaleString()}
-                    </div>
-                </div>
+                <SummaryCard
+                    title="Average / Month"
+                    value={`€${Math.round(avgVal).toLocaleString()}`}
+                    icon={DollarSign}
+                    color="text-blue-500"
+                />
+                <SummaryCard
+                    title="Lowest Month"
+                    value={`€${Math.round(minVal).toLocaleString()}`}
+                    icon={TrendingDown}
+                    color="text-emerald-500"
+                />
+                <SummaryCard
+                    title="Peak Month"
+                    value={`€${Math.round(maxVal).toLocaleString()}`}
+                    icon={TrendingUp}
+                    color="text-red-500"
+                />
             </div>
+
 
             {/* Bar Chart */}
             <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -142,6 +129,8 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-900/50">
                         <tr>
                             <th className="px-6 py-3">Month / Period</th>
+                            <th className="px-6 py-3 text-center">Volume</th>
+                            <th className="px-6 py-3">Data Quality</th>
                             <th className="px-6 py-3 text-right">Total Amount</th>
                             <th className="px-6 py-3 text-center">Action</th>
                         </tr>
@@ -150,6 +139,37 @@ export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDril
                         {chartData.map((d, i) => (
                             <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                                 <td className="px-6 py-4 font-medium">{d.Period}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex flex-col items-center">
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                            {d.invoice_count} <span className="text-slate-400 text-xs font-normal">Inv</span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 uppercase tracking-wide">
+                                            {d.item_count} Pos
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex flex-col gap-1.5 w-full max-w-[140px]">
+                                        <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-500">
+                                            <span>Completeness</span>
+                                            <span className={d.synthetic_invoices > 0 ? 'text-orange-500' : 'text-emerald-500'}>
+                                                {Math.round(((d.invoice_count - d.synthetic_invoices) / (d.invoice_count || 1)) * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${d.synthetic_invoices > 0 ? 'bg-orange-400' : 'bg-emerald-500'}`}
+                                                style={{ width: `${Math.round(((d.invoice_count - d.synthetic_invoices) / (d.invoice_count || 1)) * 100)}%` }}
+                                            />
+                                        </div>
+                                        {d.synthetic_invoices > 0 && (
+                                            <div className="text-[9px] text-orange-600 font-medium">
+                                                {d.synthetic_invoices} Synthetic IDs
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
                                 <td className={`px-6 py-4 text-right font-bold ${d.total < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
                                     {d.total < 0 ? '-' : ''}€{Math.round(Math.abs(d.total)).toLocaleString()}
                                 </td>

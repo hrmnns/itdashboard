@@ -49,11 +49,11 @@ export const ItForecastTile: React.FC = () => {
         <div className="flex flex-col h-full space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                    <h3 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5 font-mono text-left">
                         <TrendingUp className="w-3 h-3 text-blue-500" />
                         {isCurrentYear ? `Projection ${analysisYear}` : `Run-Rate ${analysisYear} (Ref)`}
                     </h3>
-                    <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    <div className="text-3xl font-black text-slate-900 dark:text-white mt-1 text-right">
                         {formatCurrency(forecastTotal)}
                     </div>
                 </div>
@@ -82,17 +82,17 @@ export const ItForecastTile: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-left">
                         {isCurrentYear ? 'Actual YTD' : 'Annual Total'}
                     </div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(actualSum)}</div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white text-right mt-1">{formatCurrency(actualSum)}</div>
                 </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-all hover:border-blue-300 dark:hover:border-blue-800">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col transition-all hover:border-blue-300 dark:hover:border-blue-800">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-left">
                         {isCurrentYear ? 'Est. Remaining' : 'Buffer / Var'}
                     </div>
-                    <div className="text-sm font-bold text-blue-600 dark:text-blue-400">{formatCurrency(remainingEstimate)}</div>
+                    <div className="text-sm font-black text-blue-600 dark:text-blue-400 text-right mt-1">{formatCurrency(remainingEstimate)}</div>
                 </div>
             </div>
 

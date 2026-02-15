@@ -46,7 +46,7 @@ export function DataTable<T>({
                         {columns.map((col, i) => (
                             <th
                                 key={i}
-                                className={`px-6 py-4 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                                className={`px-6 py-4 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
                             >
                                 {col.header}
                             </th>

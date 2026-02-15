@@ -35,21 +35,21 @@ export const ItCostsTile: React.FC<ItCostsTileProps> = () => {
             {/* Top Metrics Row */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
-                        <Wallet className="w-4 h-4" />
-                        <span className="text-[10px] uppercase font-bold tracking-wider">Total Spend ({summary.latest_year})</span>
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
+                        <Wallet className="w-3.5 h-3.5" />
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Total Spend ({summary.latest_year})</span>
                     </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-white leading-none text-right">
+                    <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
                         €{summary.total_amount?.toLocaleString()}
                     </div>
                 </div>
 
                 <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-3 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30">
-                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-1">
-                        <Users className="w-4 h-4" />
-                        <span className="text-[10px] uppercase font-bold tracking-wider">Active Vendors</span>
+                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-2">
+                        <Users className="w-3.5 h-3.5" />
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Active Vendors</span>
                     </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-white leading-none text-right">
+                    <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
                         {summary.active_vendors}
                     </div>
                 </div>

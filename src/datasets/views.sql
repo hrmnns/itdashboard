@@ -6,7 +6,10 @@ WITH aggregated_invoice_costs AS (
         SUM(Amount) as value, 
         'EUR' as unit, 
         'Actuals' as category, 
-        MAX(PostingDate) as date
+        CASE 
+            WHEN Period LIKE '%-13' THEN date(MAX(PostingDate), '+1 day') 
+            ELSE MAX(PostingDate) 
+        END as date
     FROM invoice_items
     GROUP BY Period
 ),
