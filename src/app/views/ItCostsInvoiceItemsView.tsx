@@ -260,7 +260,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     ];
 
     return (
-        <div className="p-6 md:p-8 space-y-6 print:space-y-4 max-w-7xl mx-auto">
+        <div className="p-6 md:p-8 space-y-6 print:space-y-4">
             <ViewHeader
                 title={vendorName}
                 subtitle={`${period}`}

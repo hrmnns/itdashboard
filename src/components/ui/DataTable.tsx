@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 
 export interface Column<T> {
     header: string;
@@ -30,22 +30,94 @@ export function DataTable<T>({
 
     const headerRef = React.useRef<HTMLDivElement>(null);
     const bodyRef = React.useRef<HTMLDivElement>(null);
+    const [sortConfig, setSortConfig] = React.useState<{ key: keyof T | string; direction: 'asc' | 'desc' } | null>(null);
+    const [filters, setFilters] = React.useState<Record<string, string>>({});
+    const [showFilters, setShowFilters] = React.useState(false);
 
     const filteredData = useMemo(() => {
-        if (!searchTerm) return data;
-        const lowerSearch = searchTerm.toLowerCase();
-        return data.filter(item =>
-            searchFields.some(field => {
-                const val = item[field];
-                return (String(val ?? '').toLowerCase()).includes(lowerSearch);
-            })
-        );
-    }, [data, searchTerm, searchFields]);
+        let processed = data;
+
+        // 1. Global Search
+        if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
+            processed = processed.filter(item =>
+                searchFields.some(field => {
+                    const val = item[field];
+                    return (String(val ?? '').toLowerCase()).includes(lowerSearch);
+                })
+            );
+        }
+
+        // 2. Column Filters
+        if (Object.keys(filters).length > 0) {
+            processed = processed.filter(item => {
+                return Object.entries(filters).every(([key, filterValue]) => {
+                    if (!filterValue) return true;
+
+                    const col = columns.find(c => (typeof c.accessor === 'string' ? c.accessor : c.header) === key);
+                    if (!col) return true;
+
+                    let itemValue: any;
+                    if (typeof col.accessor === 'function') {
+                        itemValue = col.accessor(item);
+                    } else {
+                        itemValue = (item as any)[col.accessor];
+                    }
+
+                    return String(itemValue ?? '').toLowerCase().includes(filterValue.toLowerCase());
+                });
+            });
+        }
+
+        // 3. Sort
+        if (sortConfig) {
+            processed = [...processed].sort((a, b) => {
+                const col = columns.find(c => c.accessor === sortConfig.key || (typeof c.accessor === 'string' && c.accessor === sortConfig.key));
+
+                let valA: any;
+                let valB: any;
+
+                if (col && typeof col.accessor === 'function') {
+                    valA = col.accessor(a);
+                    valB = col.accessor(b);
+                } else {
+                    valA = (a as any)[sortConfig.key];
+                    valB = (b as any)[sortConfig.key];
+                }
+
+                if (valA === valB) return 0;
+                if (valA === null || valA === undefined) return 1;
+                if (valB === null || valB === undefined) return -1;
+
+                const compareResult = valA < valB ? -1 : 1;
+                return sortConfig.direction === 'asc' ? compareResult : -compareResult;
+            });
+        }
+
+        return processed;
+    }, [data, searchTerm, searchFields, sortConfig, columns, filters]);
 
     const handleScroll = () => {
         if (headerRef.current && bodyRef.current) {
             headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
         }
+    };
+
+    const requestSort = (col: Column<T>) => {
+        const key = typeof col.accessor === 'string' ? col.accessor : col.header;
+
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const handleFilterChange = (key: string, value: string) => {
+        setFilters(prev => ({
+            ...prev,
+            [key]: value
+        }));
     };
 
     const renderColGroup = () => (
@@ -67,16 +139,77 @@ export function DataTable<T>({
                     {renderColGroup()}
                     <thead className="text-[10px] text-slate-400 uppercase font-bold text-left">
                         <tr>
-                            {columns.map((col, i) => (
-                                <th
-                                    key={i}
-                                    className={`px-4 py-3 truncate ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
-                                    title={col.header}
-                                >
-                                    {col.header}
-                                </th>
-                            ))}
+                            {columns.map((col, i) => {
+                                const key = typeof col.accessor === 'string' ? col.accessor : col.header;
+                                const isSorted = sortConfig?.key === key;
+
+                                return (
+                                    <th
+                                        key={i}
+                                        className={`px-4 py-3 truncate cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.className || ''}`}
+                                        title={col.header}
+                                        onClick={() => requestSort(col)}
+                                    >
+                                        <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'}`}>
+                                            {/* Filter Toggle in First Column */}
+                                            {i === 0 && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowFilters(!showFilters);
+                                                    }}
+                                                    className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mr-2 ${showFilters || Object.keys(filters).length > 0 ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/40' : 'text-slate-500 hover:text-slate-700'}`}
+                                                    title="Toggle Column Filters"
+                                                >
+                                                    <Filter className="w-4 h-4" />
+                                                </button>
+                                            )}
+
+                                            <span className="truncate">{col.header}</span>
+
+                                            {isSorted && (
+                                                <span className="text-blue-500 text-[9px]">
+                                                    {sortConfig.direction === 'asc' ? '▲' : '▼'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </th>
+                                )
+                            })}
                         </tr>
+                        {/* Filter Row */}
+                        {showFilters && (
+                            <tr className="bg-slate-100/50 dark:bg-slate-800/50">
+                                {columns.map((col, i) => {
+                                    const key = typeof col.accessor === 'string' ? col.accessor : col.header;
+                                    return (
+                                        <th key={i} className="px-2 py-1">
+                                            <div className="relative flex items-center">
+                                                <input
+                                                    type="text"
+                                                    value={filters[key as string] || ''}
+                                                    onChange={(e) => handleFilterChange(key as string, e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    placeholder={`Filter ${col.header}...`}
+                                                    className="w-full px-2 py-1 text-[10px] font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-300"
+                                                />
+                                                {filters[key as string] && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleFilterChange(key as string, '');
+                                                        }}
+                                                        className="absolute right-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        )}
                     </thead>
                 </table>
             </div>

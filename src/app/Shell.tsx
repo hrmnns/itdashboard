@@ -189,7 +189,7 @@ export const Shell: React.FC = () => {
 
                 <div className="flex-1 min-h-0 overflow-hidden relative">
                     {currentView === 'dashboard' && (
-                        <div className="animate-in fade-in duration-500">
+                        <div className="h-full overflow-y-auto animate-in fade-in duration-500">
                             <TileGrid
                                 onNavigate={(view: any) => setCurrentView(view)}
                                 visibleTileIds={visibleTileIds}
@@ -201,7 +201,7 @@ export const Shell: React.FC = () => {
                     )}
 
                     {currentView === 'datasource' && (
-                        <div className="p-8 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="h-full overflow-y-auto p-8 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
                             <div className="mb-8">
                                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Data Management</h2>
                                 <p className="text-slate-500 dark:text-slate-400">
@@ -309,7 +309,7 @@ export const Shell: React.FC = () => {
                     )}
 
                     {currentView === 'settings' && (
-                        <div className="p-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
                             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Settings</h2>
 
                             {/* Appearance Section */}
@@ -443,7 +443,7 @@ export const Shell: React.FC = () => {
 
                     {
                         currentView === 'it-costs-year' && (
-                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
                                 <ItCostsYearView
                                     onBack={() => setCurrentView('dashboard')}
                                     onDrillDown={(period: string) => {
@@ -457,7 +457,7 @@ export const Shell: React.FC = () => {
 
                     {
                         currentView === 'it-costs-month' && selectedPeriod && (
-                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
                                 <ItCostsMonthView
                                     period={selectedPeriod}
                                     onBack={() => setCurrentView('it-costs-year')}
@@ -472,7 +472,7 @@ export const Shell: React.FC = () => {
 
                     {
                         currentView === 'it-costs-invoice' && selectedInvoiceId && (
-                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
                                 <ItCostsInvoiceItemsView
                                     invoiceId={selectedInvoiceId}
                                     period={selectedPeriod || ''}
@@ -495,7 +495,7 @@ export const Shell: React.FC = () => {
 
                     {
                         currentView === 'it-costs-item-history' && selectedItem && (
-                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                            <div className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-500">
                                 <ItCostsItemHistoryView
                                     item={selectedItem}
                                     onBack={() => setCurrentView('it-costs-invoice')}
