@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Calendar, TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
+import { ArrowLeft, TrendingUp, AlertCircle, Info, Tag, Layers, Receipt } from 'lucide-react';
 import { DataTable } from '../../components/ui/DataTable';
 import { Modal } from '../components/Modal';
 
