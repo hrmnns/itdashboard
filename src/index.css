@@ -1,3 +1,88 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    @media print {
+
+        /* Hide navigational and interactive elements */
+        aside,
+        nav,
+        header,
+        footer,
+        button,
+        .no-print,
+        .z-50,
+        .fixed,
+        .absolute-actions {
+            display: none !important;
+        }
+
+        body {
+            background: white !important;
+            color: #0f172a !important;
+            /* slate-900 */
+            font-size: 12pt;
+        }
+
+        main {
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            overflow: visible !important;
+        }
+
+        .flex-1.overflow-auto {
+            overflow: visible !important;
+            height: auto !important;
+        }
+
+        /* Layout adjustments */
+        .grid {
+            display: block !important;
+        }
+
+        .p-8,
+        .p-6,
+        .p-4 {
+            padding: 0.5cm !important;
+        }
+
+        /* Premium preservation */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            overflow: visible !important;
+        }
+
+        /* Page breaks */
+        .page-break-before {
+            page-break-before: always;
+        }
+
+        .avoid-break {
+            page-break-inside: avoid;
+        }
+
+        /* Print only visibility */
+        .print-only {
+            display: block !important;
+            visibility: visible !important;
+        }
+
+        /* Shadow removal for cleaner prints */
+        .shadow-sm,
+        .shadow-md,
+        .shadow-lg,
+        .shadow-xl {
+            box-shadow: none !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+    }
+}
+
+/* Default state for print-only elements */
+.print-only {
+    display: none;
+}

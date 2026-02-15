@@ -3,7 +3,8 @@ import { TileGrid } from './TileGrid';
 import { ExcelImport } from './components/ExcelImport';
 import { SchemaDocumentation } from './components/SchemaDocumentation';
 import { SystemStatus } from './components/SystemStatus';
-import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, Info, Upload, ShieldCheck, Bell, Save, RefreshCw } from 'lucide-react';
+import { runQuery } from '../lib/db';
 import { ItCostsYearView } from './views/ItCostsYearView';
 import { ItCostsMonthView } from './views/ItCostsMonthView';
 import { ItCostsInvoiceItemsView } from './views/ItCostsInvoiceItemsView';
@@ -26,6 +27,44 @@ export const Shell: React.FC = () => {
     const [theme, setTheme] = useLocalStorage<'light' | 'dark' | 'system'>('theme', 'system');
     const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
     const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', TILES.map(t => t.id));
+    const [webhookUrl, setWebhookUrl] = useState('');
+    const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            const result = await runQuery("SELECT value FROM settings WHERE key = 'webhook_url'");
+            if (result && result.length > 0) {
+                setWebhookUrl(result[0].value);
+            }
+        };
+        fetchSettings();
+    }, [currentView]);
+
+    const handleSaveWebhook = async () => {
+        await runQuery("INSERT OR REPLACE INTO settings (key, value) VALUES ('webhook_url', ?)", [webhookUrl]);
+        alert('Notification settings saved successfully!');
+    };
+
+    const handleTestWebhook = async () => {
+        if (!webhookUrl) return alert('Please enter a Webhook URL first.');
+        setIsTestingWebhook(true);
+        try {
+            await fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: `🧪 *IT Dashboard Test Notification*\nYour Webhook integration is working perfectly! ✅\n*Time:* ${new Date().toLocaleString()}`
+                })
+            });
+            alert('Test notification sent manually! Check your Slack/Teams channel.');
+        } catch (err) {
+            console.error('Test failed', err);
+            alert('Failed to send test notification. Check console for errors.');
+        } finally {
+            setIsTestingWebhook(false);
+        }
+    };
 
     React.useEffect(() => {
         const root = window.document.documentElement;
@@ -312,111 +351,163 @@ export const Shell: React.FC = () => {
                                     </span>
                                     Dashboard Customization
                                 </h3>
-                                <div className="space-y-4">
+                                <div className="grid grid-cols-1 gap-2">
+                                    {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map((tile: any) => (
+                                        <div
+                                            key={tile!.id}
+                                            className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (visibleTileIds.includes(tile!.id)) {
+                                                        setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
+                                                    } else {
+                                                        setVisibleTileIds([...visibleTileIds, tile!.id]);
+                                                    }
+                                                }}
+                                                className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Global Notification Settings Section */}
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mt-6">
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <span className="p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                        <Bell className="w-4 h-4 text-blue-500" />
+                                    </span>
+                                    Global Notification Settings
+                                </h3>
+                                <div className="space-y-6">
                                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                                        Select which tiles you want to see on your dashboard.
+                                        Configure how you receive automated alerts for system outages and anomalies.
                                     </p>
 
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {tileOrder.map(id => TILES.find(t => t.id === id)).filter(Boolean).map(tile => (
-                                            <div
-                                                key={tile!.id}
-                                                className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-2 h-2 rounded-full ${visibleTileIds.includes(tile!.id) ? 'bg-blue-500' : 'bg-slate-300'}`} />
-                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{tile!.title}</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        if (visibleTileIds.includes(tile!.id)) {
-                                                            setVisibleTileIds(visibleTileIds.filter(id => id !== tile!.id));
-                                                        } else {
-                                                            setVisibleTileIds([...visibleTileIds, tile!.id]);
-                                                        }
-                                                    }}
-                                                    className={`w-12 h-6 rounded-full transition-colors relative ${visibleTileIds.includes(tile!.id) ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${visibleTileIds.includes(tile!.id) ? 'left-7' : 'left-1'}`} />
-                                                </button>
-                                            </div>
-                                        ))}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Webhook URL (Slack/Teams)</label>
+                                        <input
+                                            type="url"
+                                            placeholder="https://hooks.slack.com/services/..."
+                                            className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl focus:border-blue-500 focus:ring-0 outline-none transition-all text-slate-900 dark:text-white font-bold"
+                                            value={webhookUrl}
+                                            onChange={(e) => setWebhookUrl(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={handleSaveWebhook}
+                                            className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-slate-100"
+                                        >
+                                            <Save className="w-5 h-5" />
+                                            Save Settings
+                                        </button>
+                                        <button
+                                            onClick={handleTestWebhook}
+                                            disabled={isTestingWebhook || !webhookUrl}
+                                            className="px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 text-slate-900 dark:text-white font-black rounded-xl transition-all flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                                        >
+                                            <RefreshCw className={`w-5 h-5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
+                                            Test
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {currentView === 'it-costs-year' && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <ItCostsYearView
-                                onBack={() => setCurrentView('dashboard')}
-                                onDrillDown={(period: string) => {
-                                    setSelectedPeriod(period);
-                                    setCurrentView('it-costs-month');
-                                }}
-                            />
-                        </div>
-                    )}
+                    {
+                        currentView === 'it-costs-year' && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <ItCostsYearView
+                                    onBack={() => setCurrentView('dashboard')}
+                                    onDrillDown={(period: string) => {
+                                        setSelectedPeriod(period);
+                                        setCurrentView('it-costs-month');
+                                    }}
+                                />
+                            </div>
+                        )
+                    }
 
-                    {currentView === 'it-costs-month' && selectedPeriod && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <ItCostsMonthView
-                                period={selectedPeriod}
-                                onBack={() => setCurrentView('it-costs-year')}
-                                onDrillDown={(invoiceId: string) => {
-                                    setSelectedInvoiceId(invoiceId);
-                                    setCurrentView('it-costs-invoice');
-                                }}
-                            />
-                        </div>
-                    )}
+                    {
+                        currentView === 'it-costs-month' && selectedPeriod && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <ItCostsMonthView
+                                    period={selectedPeriod}
+                                    onBack={() => setCurrentView('it-costs-year')}
+                                    onDrillDown={(invoiceId: string) => {
+                                        setSelectedInvoiceId(invoiceId);
+                                        setCurrentView('it-costs-invoice');
+                                    }}
+                                />
+                            </div>
+                        )
+                    }
 
-                    {currentView === 'it-costs-invoice' && selectedInvoiceId && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <ItCostsInvoiceItemsView
-                                invoiceId={selectedInvoiceId}
-                                period={selectedPeriod || ''}
-                                onBack={() => setCurrentView('it-costs-month')}
-                                onViewHistory={(vendorId: string, description: string) => {
-                                    setSelectedItemParams({ vendorId, description });
-                                    setCurrentView('it-costs-item-history');
-                                }}
-                            />
-                        </div>
-                    )}
+                    {
+                        currentView === 'it-costs-invoice' && selectedInvoiceId && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <ItCostsInvoiceItemsView
+                                    invoiceId={selectedInvoiceId}
+                                    period={selectedPeriod || ''}
+                                    onBack={() => setCurrentView('it-costs-month')}
+                                    onViewHistory={(vendorId: string, description: string) => {
+                                        setSelectedItemParams({ vendorId, description });
+                                        setCurrentView('it-costs-item-history');
+                                    }}
+                                />
+                            </div>
+                        )
+                    }
 
-                    {currentView === 'it-costs-item-history' && selectedItemParams && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <ItCostsItemHistoryView
-                                vendorId={selectedItemParams.vendorId}
-                                description={selectedItemParams.description}
-                                onBack={() => setCurrentView('it-costs-invoice')}
-                            />
-                        </div>
-                    )}
+                    {
+                        currentView === 'it-costs-item-history' && selectedItemParams && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <ItCostsItemHistoryView
+                                    vendorId={selectedItemParams.vendorId}
+                                    description={selectedItemParams.description}
+                                    onBack={() => setCurrentView('it-costs-invoice')}
+                                />
+                            </div>
+                        )
+                    }
 
-                    {currentView === 'data-inspector' && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <DataInspector onBack={() => setCurrentView('dashboard')} />
-                        </div>
-                    )}
+                    {
+                        currentView === 'data-inspector' && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <DataInspector onBack={() => setCurrentView('dashboard')} />
+                            </div>
+                        )
+                    }
 
-                    {currentView === 'systems-management' && (
-                        <div className="animate-in slide-in-from-right-4 duration-500 h-full">
-                            <SystemsManagementView onBack={() => setCurrentView('dashboard')} />
-                        </div>
-                    )}
-                </div>
-            </main>
+                    {
+                        currentView === 'systems-management' && (
+                            <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                                <SystemsManagementView onBack={() => setCurrentView('dashboard')} />
+                            </div>
+                        )
+                    }
+                </div >
+            </main >
 
             {/* Overlay for mobile */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-        </div>
+            {
+                sidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )
+            }
+        </div >
     );
 };

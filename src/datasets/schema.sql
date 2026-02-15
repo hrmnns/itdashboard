@@ -51,3 +51,8 @@ CREATE TABLE IF NOT EXISTS systems (
   is_favorite INTEGER DEFAULT 0,
   sort_order INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);

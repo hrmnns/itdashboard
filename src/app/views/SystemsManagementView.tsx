@@ -3,7 +3,7 @@ import { useQuery } from '../../hooks/useQuery';
 import { runQuery } from '../../lib/db';
 import {
     Plus, Save, RefreshCw, HelpCircle, CheckCircle2, XCircle,
-    Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter
+    Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter, Settings, Printer
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import {
@@ -36,6 +36,39 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('All');
     const [newSystem, setNewSystem] = React.useState({ name: '', url: '', category: 'IT' });
+    const [webhookUrl, setWebhookUrl] = React.useState('');
+    const [showSettings, setShowSettings] = React.useState(false);
+
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            const result = await runQuery("SELECT value FROM settings WHERE key = 'webhook_url'");
+            if (result && result.length > 0) {
+                setWebhookUrl(result[0].value);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const handleSaveSettings = async () => {
+        await runQuery("INSERT OR REPLACE INTO settings (key, value) VALUES ('webhook_url', ?)", [webhookUrl]);
+        setShowSettings(false);
+    };
+
+    const sendWebhookNotification = async (systemName: string) => {
+        if (!webhookUrl) return;
+        try {
+            await fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: `🚨 *System Outage Alert*\n*System:* ${systemName}\n*Status:* OFFLINE\n*Time:* ${new Date().toLocaleString()}`
+                })
+            });
+        } catch (err) {
+            console.error('Failed to send webhook', err);
+        }
+    };
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -82,6 +115,10 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                 const probeUrl = new URL('/favicon.ico', system.url).href;
                 img.src = `${probeUrl}?t=${Date.now()}`;
             });
+
+            if (status === 'offline' && system.status !== 'offline') {
+                await sendWebhookNotification(system.name);
+            }
 
             await runQuery('UPDATE systems SET status = ? WHERE id = ?', [status, system.id]);
         }
@@ -177,24 +214,120 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 no-print">
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-lg active:scale-95"
+                    >
+                        <Printer className="w-5 h-5" />
+                        Print Report
+                    </button>
+                    <button
+                        onClick={() => setShowSettings(true)}
+                        className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
+                        title="Configure Webhooks"
+                    >
+                        <Settings className="w-6 h-6" />
+                    </button>
                     <button
                         onClick={handleCheckHealth}
                         disabled={isScanning}
                         className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
                     >
                         <RefreshCw className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
-                        {isScanning ? 'Scanning Infrastructure...' : 'Scan All Systems'}
+                        {isScanning ? 'Scanning...' : 'Scan Systems'}
                     </button>
                     <button
                         onClick={() => setIsAddModalOpen(true)}
                         className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none"
                     >
                         <Plus className="w-5 h-5" />
-                        Add New System
+                        Add System
                     </button>
                 </div>
             </div>
+
+            {/* Print Only Header */}
+            <div className="hidden print-only mb-8 border-b-4 border-slate-900 pb-6">
+                <div className="flex justify-between items-end">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1.5 bg-slate-900 rounded-lg">
+                                <ShieldCheck className="w-5 h-5 text-white" />
+                            </div>
+                            <span className="text-lg font-black tracking-tight text-slate-900">IT DASHBOARD</span>
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Infrastructure Health Report</h1>
+                        <p className="text-slate-500 font-bold">Current System Status Overview • {new Date().toLocaleDateString('de-DE')}</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-[10px] font-black uppercase text-slate-400 mt-2">Managed Systems</div>
+                        <div className="text-2xl font-black text-slate-900">{filteredSystems?.length || 0} Assets</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Webhook Settings Modal */}
+            <Modal isOpen={showSettings} onClose={() => setShowSettings(false)} title="Global Notification Settings">
+                <div className="space-y-6">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50">
+                        <div className="flex items-start gap-3">
+                            <HelpCircle className="w-5 h-5 text-blue-500 mt-1" />
+                            <div className="space-y-1">
+                                <h4 className="text-sm font-bold text-blue-900 dark:text-blue-100">About Webhooks</h4>
+                                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                                    When a system is detected as offline during a scan, a notification will be sent to this URL.
+                                    Compatible with Slack "Incoming Webhooks" and Microsoft Teams "Connectors".
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Webhook URL</label>
+                        <input
+                            type="url"
+                            placeholder="https://hooks.slack.com/services/..."
+                            className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl focus:border-blue-500 focus:ring-0 outline-none transition-all text-slate-900 dark:text-white font-bold"
+                            value={webhookUrl}
+                            onChange={(e) => setWebhookUrl(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleSaveSettings}
+                            className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 hover:bg-slate-800 dark:hover:bg-slate-100"
+                        >
+                            <Save className="w-6 h-6" />
+                            Save Settings
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (!webhookUrl) return alert('Please enter a Webhook URL first.');
+                                try {
+                                    await fetch(webhookUrl, {
+                                        method: 'POST',
+                                        mode: 'no-cors',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            text: `🧪 *IT Dashboard Test Notification*\nYour Webhook integration is working perfectly! ✅\n*Time:* ${new Date().toLocaleString()}`
+                                        })
+                                    });
+                                    alert('Test notification sent manually! Check your Slack/Teams channel.');
+                                } catch (err) {
+                                    console.error('Test failed', err);
+                                    alert('Failed to send test notification.');
+                                }
+                            }}
+                            className="px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white font-black rounded-2xl transition-all flex items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            <RefreshCw className="w-5 h-5" />
+                            Test
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Filters */}
             <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">

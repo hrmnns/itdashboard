@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
-import { ArrowLeft, Search, Receipt, Calendar, Tag, AlertTriangle, PlusCircle, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Search, Receipt, Calendar, Tag, AlertTriangle, PlusCircle, TrendingUp, Printer, ShieldCheck } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 
 interface ItCostsInvoiceItemsViewProps {
@@ -55,17 +55,6 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     // Enhance items with anomaly flags
     const normalize = (s: string | null | undefined) => (s || '').replace(/\d+/g, '#').trim();
 
-    // Debug: Always show which invoice we are looking at
-    console.log(`[ItCostsInvoiceItemsView] Rendering for ID: "${invoiceId}" (type: ${typeof invoiceId})`);
-
-    const isTargetInvoice = String(invoiceId).trim() === '4000000921';
-
-    if (isTargetInvoice) {
-        console.group(`🔍 Debugging Anomaly for Invoice: ${invoiceId}`);
-        console.log(`Current items:`, items.length);
-        console.log(`Previous month items available for comparison:`, previousItems.length);
-    }
-
     const enhancedItems = items.map((item: any) => {
         // PRIORITY 1: Match by DocumentId + LineId + CostCenter (for unique recurring identification)
         let match = previousItems.find((p: any) =>
@@ -73,7 +62,6 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             String(p.LineId).trim() === String(item.LineId).trim() &&
             String(p.CostCenter).trim() === String(item.CostCenter).trim()
         );
-        let matchType = match ? 'Priority 1 (DocId+LineId)' : 'None';
 
         // PRIORITY 2: Fallback to Description + Category
         if (!match) {
@@ -81,7 +69,6 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                 normalize(p.Description) === normalize(item.Description) &&
                 p.Category === item.Category
             );
-            if (match) matchType = 'Priority 2 (Fuzzy Description)';
         }
 
         let status: 'normal' | 'new' | 'changed' = 'normal';
@@ -98,18 +85,8 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             }
         }
 
-        if (isTargetInvoice) {
-            console.log(`Item #${item.LineId}: ${item.Description}`);
-            console.log(`  - Match: ${matchType}`, match ? `(Amt: ${match.Amount})` : '');
-            console.log(`  - Result: ${status}`);
-        }
-
         return { ...item, status, previousAmount };
     });
-
-    if (isTargetInvoice) {
-        console.groupEnd();
-    }
 
     const columns: Column<any>[] = [
         {
@@ -205,9 +182,31 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     ];
 
     return (
-        <div className="p-6 md:p-8 space-y-6">
+        <div className="p-6 md:p-8 space-y-6 print:space-y-4">
+            {/* Print Only Header */}
+            <div className="hidden print-only mb-8 border-b-4 border-slate-900 pb-6">
+                <div className="flex justify-between items-end">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1.5 bg-slate-900 rounded-lg">
+                                <ShieldCheck className="w-5 h-5 text-white" />
+                            </div>
+                            <span className="text-lg font-black tracking-tight text-slate-900">IT DASHBOARD</span>
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Monthly Cost Audit</h1>
+                        <p className="text-slate-500 font-bold">Standard Financial Reporting • {period}</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-[10px] font-black uppercase text-slate-400 mt-2">Reference ID</div>
+                        <div className="font-mono text-sm underline decoration-blue-500/30">INV-{invoiceId}</div>
+                        <div className="text-[10px] font-black uppercase text-slate-400 mt-2">Export Date</div>
+                        <div className="font-bold">{new Date().toLocaleDateString('de-DE')}</div>
+                    </div>
+                </div>
+            </div>
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={onBack}
@@ -227,6 +226,14 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                         </h2>
                     </div>
                 </div>
+
+                <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-lg active:scale-95"
+                >
+                    <Printer className="w-4 h-4" />
+                    Print / Export PDF
+                </button>
             </div>
 
             {/* Invoice Info Bar */}
@@ -249,7 +256,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                         <div className="text-sm font-bold">{items.length} Items</div>
                     </div>
                 </div>
-                <div className="flex-1"></div>
+                <div className="flex-1 no-print"></div>
                 <div className="flex flex-col items-end">
                     <div className="text-[10px] text-slate-400 uppercase font-black">Invoice Total</div>
                     <div className={`text-2xl font-black ${totalAmount < 0 ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
@@ -260,7 +267,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
             {/* Search and Table */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 no-print">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
@@ -285,7 +292,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
                 <DataTable
                     data={enhancedItems}
-                    columns={columns}
+                    columns={columns.filter(col => col.accessor !== 'actions')}
                     searchTerm={searchTerm}
                     searchFields={['Description', 'CostCenter', 'GLAccount', 'Category']}
                     emptyMessage="No positions found matching your search"

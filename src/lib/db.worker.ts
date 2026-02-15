@@ -61,6 +61,9 @@ async function initDB() {
                     db.exec("UPDATE systems SET sort_order = id");
                 }
             }
+
+            // Create settings table if not exists (for existing DBs)
+            db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
         } catch (e) {
             error('Migration failed', e);
         }
