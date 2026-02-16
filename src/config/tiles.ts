@@ -6,7 +6,7 @@ export const TILES: TileConfig[] = [
         title: 'IT Kosten',
         component: 'ItCostsTile',
         targetView: '/costs',
-        defaultSize: 'medium',
+        defaultSize: 'small',
     },
     {
         id: 'systems',
@@ -39,7 +39,7 @@ export const TILES: TileConfig[] = [
         title: 'Anomaly Radar',
         component: 'AnomalyRadarTile',
         targetView: '/anomalies',
-        defaultSize: 'medium',
+        defaultSize: 'small',
     },
     {
         id: 'worklist',

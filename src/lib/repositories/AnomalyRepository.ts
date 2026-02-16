@@ -31,5 +31,16 @@ export const AnomalyRepository = {
 
     async getTopRisks(limit: number = 3): Promise<Anomaly[]> {
         return await runQuery(`SELECT * FROM view_anomalies ORDER BY RiskScore DESC, Period DESC LIMIT ?`, [limit]) as unknown as Anomaly[];
+    },
+
+    async getAnomalyMetrics(): Promise<{ totalRisks: number; maxScore: number; criticalRisks: number }> {
+        const result = await runQuery(`
+            SELECT 
+                COUNT(*) as totalRisks,
+                COALESCE(MAX(RiskScore), 0) as maxScore,
+                COUNT(CASE WHEN RiskScore >= 80 THEN 1 END) as criticalRisks
+            FROM view_anomalies
+        `);
+        return result[0] as unknown as { totalRisks: number; maxScore: number; criticalRisks: number };
     }
 };
