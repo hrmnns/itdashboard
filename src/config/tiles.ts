@@ -42,6 +42,12 @@ export const TILES: TileConfig[] = [
         defaultSize: 'small',
     },
     {
+        id: 'system-status',
+        title: 'System Status',
+        component: 'SystemStatusTile',
+        defaultSize: 'small',
+    },
+    {
         id: 'worklist',
         title: 'Arbeitsvorrat',
         component: 'WorklistTile',
