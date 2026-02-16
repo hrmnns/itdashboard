@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar } from 'lucide-react';
+import { DashboardTile } from '../components/ui/DashboardTile';
 
-export const ClockTile: React.FC = () => {
+export const ClockTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -19,37 +20,31 @@ export const ClockTile: React.FC = () => {
 
     const dateString = time.toLocaleDateString('de-DE', {
         weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        month: 'long'
     });
 
     return (
-        <div className="flex flex-col h-full justify-between p-1">
-            <div className="space-y-1">
-                <div className="flex items-center gap-2 text-slate-400">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Local Time</span>
+        <DashboardTile
+            title="Lokale Zeit"
+            icon={Clock}
+            iconColor="slate"
+            onRemove={onRemove}
+            dragHandleProps={dragHandleProps}
+            onClick={onClick}
+            backgroundIcon={Clock}
+            footerLeft={
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <Calendar className="w-3 h-3" />
+                    {dateString}
                 </div>
+            }
+        >
+            <div className="">
                 <div className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white tabular-nums drop-shadow-sm">
                     {timeString}
                 </div>
             </div>
-
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/50">
-                <div className="flex items-center gap-2 text-slate-400 mb-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Calendar</span>
-                </div>
-                <div className="text-[13px] font-bold text-slate-600 dark:text-slate-300">
-                    {dateString}
-                </div>
-            </div>
-
-            {/* Aesthetic Background Element */}
-            <div className="absolute top-0 right-0 p-4 opacity-[0.03] dark:opacity-[0.07] pointer-events-none">
-                <Clock className="w-32 h-32 -rotate-12 translate-x-8 -translate-y-4" />
-            </div>
-        </div>
+        </DashboardTile>
     );
 };

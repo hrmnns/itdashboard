@@ -1,13 +1,12 @@
 import React from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
-import { useNavigate } from 'react-router-dom';
 import type { SystemRecord } from '../../types';
-import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
+import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star, Server } from 'lucide-react';
 import { Skeleton } from '../components/ui/Skeleton';
+import { DashboardTile } from '../components/ui/DashboardTile';
 
-export const SystemsTile: React.FC = () => {
-    const navigate = useNavigate();
+export const SystemsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
     const { data: systems, loading, error } = useAsync<SystemRecord[]>(
         () => SystemRepository.getFavorites(),
         [],
@@ -15,17 +14,14 @@ export const SystemsTile: React.FC = () => {
     );
 
     if (loading && !systems) return (
-        <div className="flex flex-col h-full gap-2 p-1 pr-2">
-            <Skeleton className="h-14 rounded-xl" />
-            <Skeleton className="h-14 rounded-xl" />
-            <Skeleton className="h-14 rounded-xl" />
-            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-4 w-12 rounded-full" />
-            </div>
+        <div className="flex flex-col h-full gap-2 p-1">
+            <Skeleton className="h-12 rounded-xl" />
+            <Skeleton className="h-12 rounded-xl" />
+            <Skeleton className="h-12 rounded-xl" />
         </div>
     );
-    if (error) return <div className="p-4 text-center text-red-500 text-xs text-wrap">Error: {error.message}</div>;
+
+    if (error) return <div className="p-4 text-center text-red-500 text-xs">Error: {error.message}</div>;
 
     const getStatusIcon = (status: string) => {
         switch (status?.toLowerCase()) {
@@ -45,57 +41,56 @@ export const SystemsTile: React.FC = () => {
     };
 
     return (
-        <div
-            className="flex flex-col h-full overflow-hidden cursor-pointer group/tile relative"
-            onClick={() => navigate('/systems')}
+        <DashboardTile
+            title="Systeme & Health"
+            subtitle="Favoriten"
+            icon={Server}
+            iconColor="slate"
+            onClick={onClick}
+            onRemove={onRemove}
+            dragHandleProps={dragHandleProps}
+            footerLeft={
+                <div className="flex items-center gap-1.5 font-bold text-[10px] text-slate-400 uppercase tracking-widest">
+                    Status
+                    <div className="flex gap-1 ml-1">
+                        {systems?.slice(0, 4).map((s: any) => (
+                            <div key={s.id} className={`w-2 h-2 rounded-full border border-white dark:border-slate-950 ${s.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        ))}
+                    </div>
+                </div>
+            }
         >
-
-            <div className="flex-1 space-y-2 pr-1 overflow-hidden pointer-events-none">
+            <div className="space-y-1">
                 {systems && systems.length > 0 ? (
-                    systems.map((system: any) => (
+                    systems.slice(0, 3).map((system: any) => (
                         <div
                             key={system.id}
-                            className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/50"
+                            className="flex items-center justify-between py-1"
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <div className="shrink-0">
                                     {getStatusIcon(system.status)}
                                 </div>
-                                <div>
-                                    <div className="text-[13px] font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 line-clamp-1">
+                                <div className="min-w-0">
+                                    <div className="text-[12px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 truncate">
                                         {system.name}
                                         {system.category && (
-                                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-tighter flex items-center gap-1">
+                                            <span className="text-[8px] font-medium text-slate-400 dark:text-slate-500 uppercase flex items-center gap-1">
                                                 {getCategoryIcon(system.category)}
                                             </span>
                                         )}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${system.status === 'online' ? 'bg-emerald-500' : system.status === 'offline' ? 'bg-red-500' : 'bg-slate-300'}`} />
-                                        {(system.status || 'unknown').toUpperCase()}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     ))
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2">
-                        <Star className="w-8 h-8 text-slate-200" />
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Favorites Selected</p>
+                    <div className="flex flex-col items-center justify-center py-4 text-slate-400">
+                        <Star className="w-6 h-6 mb-1 opacity-20" />
+                        <p className="text-[9px] font-bold uppercase tracking-widest">No Favorites</p>
                     </div>
                 )}
             </div>
-
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between pointer-events-none">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Infrastructure Status
-                </div>
-                <div className="flex -space-x-1">
-                    {systems?.slice(0, 3).map((s: any) => (
-                        <div key={s.id} className={`w-2 h-2 rounded-full border border-white dark:border-slate-950 ${s.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    ))}
-                </div>
-            </div>
-        </div>
+        </DashboardTile>
     );
 };
