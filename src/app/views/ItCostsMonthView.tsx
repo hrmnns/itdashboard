@@ -48,13 +48,15 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     // Fetch current month invoices
     const { data: currentItems, loading: loadingCurrent } = useAsync<InvoiceItem[]>(
         () => InvoiceRepository.getMonthlyOverview(period),
-        [period]
+        [period],
+        { cacheKey: `month-overview-${period}`, ttl: 10 * 60 * 1000 }
     );
 
     // Fetch previous period for comparison
     const { data: previousItems, loading: loadingPrevious } = useAsync<InvoiceItem[]>(
         () => InvoiceRepository.getMonthlyOverview(previousPeriod),
-        [previousPeriod]
+        [previousPeriod],
+        { cacheKey: `month-overview-${previousPeriod}`, ttl: 10 * 60 * 1000 }
     );
 
     // Intra-month duplicate detection (ambiguity check)

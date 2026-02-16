@@ -1,12 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import { runQuery, initDB } from '../lib/db';
+import { queryCache } from '../lib/cache';
 import type { DbRow } from '../types';
 
-export function useQuery<T = DbRow>(query: string, params: (string | number | null | undefined)[] = []) {
-    const [data, setData] = useState<T[]>([]);
-    const [loading, setLoading] = useState(true);
+export interface UseQueryOptions {
+    cacheKey?: string;
+    ttl?: number;
+}
+
+export function useQuery<T = DbRow>(
+    query: string,
+    params: (string | number | null | undefined)[] = [],
+    options: UseQueryOptions = {}
+) {
+    const { cacheKey, ttl } = options;
+
+    // Initialize with cached data if available
+    const [data, setData] = useState<T[]>(() => {
+        if (cacheKey) {
+            return queryCache.get<T[]>(cacheKey) || [];
+        }
+        return [];
+    });
+
+    const [loading, setLoading] = useState(!cacheKey || !queryCache.get(cacheKey));
     const [error, setError] = useState<Error | null>(null);
-    const [version, setVersion] = useState(0); // To force refresh
+    const [version, setVersion] = useState(0);
 
     const refresh = useCallback(() => {
         setVersion(v => v + 1);
@@ -16,7 +35,6 @@ export function useQuery<T = DbRow>(query: string, params: (string | number | nu
         let mounted = true;
 
         const fetchData = async () => {
-            // Skip execution if query is empty
             if (!query || query.trim() === '') {
                 if (mounted) {
                     setData([]);
@@ -26,17 +44,23 @@ export function useQuery<T = DbRow>(query: string, params: (string | number | nu
             }
 
             try {
-                setLoading(true);
-                await initDB();
+                // Only show loading if we don't have cached data
+                if (!cacheKey || !queryCache.get(cacheKey)) {
+                    setLoading(true);
+                }
 
+                await initDB();
                 const result = await runQuery(query, params);
+
                 if (mounted) {
                     setData(result as T[]);
                     setError(null);
+                    if (cacheKey) {
+                        queryCache.set(cacheKey, result, ttl);
+                    }
                 }
             } catch (err: unknown) {
                 if (mounted) {
-                    console.error('Query error:', err);
                     setError(err instanceof Error ? err : new Error(String(err)));
                 }
             } finally {
@@ -48,17 +72,26 @@ export function useQuery<T = DbRow>(query: string, params: (string | number | nu
 
         fetchData();
 
-        // Listen for global DB update events
-        const handleDbUpdate = () => {
-            fetchData();
-        };
+        // If caching is enabled, subscribe to cache updates
+        let unsubscribe: (() => void) | undefined;
+        if (cacheKey) {
+            unsubscribe = queryCache.subscribe(cacheKey, () => {
+                const cached = queryCache.get<T[]>(cacheKey);
+                if (cached && mounted) {
+                    setData(cached);
+                }
+            });
+        }
+
+        const handleDbUpdate = () => fetchData();
         window.addEventListener('db-updated', handleDbUpdate);
 
         return () => {
             mounted = false;
             window.removeEventListener('db-updated', handleDbUpdate);
+            if (unsubscribe) unsubscribe();
         };
-    }, [query, JSON.stringify(params), version]);
+    }, [query, JSON.stringify(params), version, cacheKey]);
 
     return { data, loading, error, refresh };
 }

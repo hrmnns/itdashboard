@@ -8,12 +8,15 @@ import { ShieldAlert, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
 import type { Anomaly } from '../../types';
 
 
+import { Skeleton } from '../components/ui/Skeleton';
+
 export const AnomalyRadarTile: React.FC = () => {
     const navigate = useNavigate();
     // Fetch top 3 critical anomalies from the latest period
     const { data: anomalies, loading } = useAsync<Anomaly[]>(
         () => AnomalyRepository.getTopRisks(3),
-        []
+        [],
+        { cacheKey: 'tile-anomaly-radar', ttl: 5 * 60 * 1000 }
     );
 
     const topRisks = useMemo(() => anomalies || [], [anomalies]);
@@ -24,7 +27,16 @@ export const AnomalyRadarTile: React.FC = () => {
         return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800';
     };
 
-    if (loading) return <div className="p-4 text-center text-slate-500 animate-pulse">Scanning for anomalies...</div>;
+    if (loading && !anomalies) return (
+        <div className="flex flex-col h-full gap-3 p-1">
+            <div className="flex justify-between items-center mb-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-3 w-12" />
+            </div>
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+        </div>
+    );
 
     return (
         <div className="flex flex-col h-full relative overflow-hidden">

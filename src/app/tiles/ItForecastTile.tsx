@@ -2,6 +2,8 @@ import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { TrendingUp, Calculator, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
+import { Skeleton } from '../components/ui/Skeleton';
+
 export const ItForecastTile: React.FC = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
@@ -22,9 +24,26 @@ export const ItForecastTile: React.FC = () => {
             (SELECT COUNT(DISTINCT Period) FROM invoice_items WHERE FiscalYear = (SELECT yr FROM LatestYear)) as monthsLatest,
             (SELECT SUM(Amount) FROM invoice_items WHERE FiscalYear = ${currentYear}) as totalCurrent,
             (SELECT COUNT(DISTINCT Period) FROM invoice_items WHERE FiscalYear = ${currentYear}) as monthsCurrent
-    `);
+    `, [], { cacheKey: 'tile-it-forecast-main', ttl: 15 * 60 * 1000 });
 
-    if (loading) return <div className="p-4 text-center text-slate-400 animate-pulse">Calculating forecast...</div>;
+    if (loading && (!stats || stats.length === 0)) return (
+        <div className="flex flex-col h-full gap-4">
+            <div className="flex justify-between">
+                <div className="space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-8 w-40" />
+                </div>
+                <Skeleton className="h-10 w-10 rounded-xl" />
+            </div>
+            <div className="space-y-4 pt-2">
+                <Skeleton className="h-10 w-full" />
+                <div className="grid grid-cols-2 gap-3">
+                    <Skeleton className="h-12" />
+                    <Skeleton className="h-12" />
+                </div>
+            </div>
+        </div>
+    );
     if (error) return <div className="p-4 text-center text-red-500 text-xs text-wrap">Error: {error.message}</div>;
 
     const s = stats?.[0];

@@ -44,6 +44,33 @@ body,
     /* slate-500 */
 }
 
+@layer utilities {
+    .glass {
+        @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/20 dark:border-slate-700/30 shadow-xl;
+    }
+
+    .animate-shimmer {
+        animation: shimmer 2s infinite linear;
+        background: linear-gradient(to right, #f1f5f9 4%, #e2e8f0 25%, #f1f5f9 36%);
+        background-size: 1000px 100%;
+    }
+
+    /* Dark mode override for shimmer */
+    .dark .animate-shimmer {
+        background: linear-gradient(to right, #1e293b 4%, #334155 25%, #1e293b 36%);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
 @layer base {
     @media print {
 

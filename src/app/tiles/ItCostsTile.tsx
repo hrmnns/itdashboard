@@ -2,29 +2,49 @@ import React from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { DashboardRepository } from '../../lib/repositories/DashboardRepository';
 import { Wallet, Users, ArrowUpRight } from 'lucide-react';
-
+import { Skeleton } from '../components/ui/Skeleton';
 import type { KpiRecord, ItCostsSummary } from '../../types';
 
-
 export const ItCostsTile: React.FC = () => {
-    // 1. Fetch aggregates
-    const { data: summary, loading: summaryLoading, error: summaryError } = useAsync<ItCostsSummary | null>(
-        () => DashboardRepository.getItCostsSummary(),
-        []
+    // Fetch both summary and trend data in parallel
+    const { data, loading, error } = useAsync<{ summary: ItCostsSummary | null; trend: KpiRecord[] }>(
+        async () => {
+            const [summary, trend] = await Promise.all([
+                DashboardRepository.getItCostsSummary(),
+                DashboardRepository.getItCostsTrend()
+            ]);
+            return { summary, trend };
+        },
+        [],
+        { cacheKey: 'it-costs-tile-combined', ttl: 5 * 60 * 1000 }
     );
 
-    // 2. Fetch history for trend (last 4 months)
-    const { data: trendData, loading: trendLoading } = useAsync<KpiRecord[]>(
-        () => DashboardRepository.getItCostsTrend(),
-        []
-    );
+    if (error) {
+        return (
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-red-200 dark:border-red-900/50 p-4 h-full flex items-center justify-center text-center">
+                <div>
+                    <p className="text-red-500 font-bold text-sm">Fehler beim Laden</p>
+                    <p className="text-[10px] text-red-400 mt-1">{error.message}</p>
+                </div>
+            </div>
+        );
+    }
 
-    if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
-    if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
+    if (loading || !data) {
+        return (
+            <div className="flex flex-col h-full gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <Skeleton className="h-[72px] rounded-xl" />
+                    <Skeleton className="h-[72px] rounded-xl" />
+                </div>
+                <div className="flex-1 rounded-xl overflow-hidden">
+                    <Skeleton className="h-full w-full" />
+                </div>
+            </div>
+        );
+    }
 
-    if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
-    // if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;
-
+    const { summary, trend: trendData } = data;
     const displaySummary = summary || { total_amount: 0, active_vendors: 0, latest_date: 'N/A', latest_year: 0 };
 
     // Trend calculation: Comparison between latest month and previous month (MoM)
@@ -47,7 +67,7 @@ export const ItCostsTile: React.FC = () => {
                 <div className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
                         <Wallet className="w-3.5 h-3.5" />
-                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Total Spend ({displaySummary.latest_year})</span>
+                        <span className="text-[9px] uppercase font-bold tracking-wider">Total Spend ({displaySummary.latest_year})</span>
                     </div>
                     <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
                         €{displaySummary.total_amount?.toLocaleString()}
@@ -57,7 +77,7 @@ export const ItCostsTile: React.FC = () => {
                 <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-3 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30">
                     <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-2">
                         <Users className="w-3.5 h-3.5" />
-                        <span className="text-[9px] uppercase font-bold tracking-wider text-left">Active Vendors</span>
+                        <span className="text-[9px] uppercase font-bold tracking-wider">Active Vendors</span>
                     </div>
                     <div className="text-xl font-black text-slate-900 dark:text-white leading-none text-right">
                         {displaySummary.active_vendors}
@@ -92,7 +112,7 @@ export const ItCostsTile: React.FC = () => {
                                     const points = [...trendData].reverse();
                                     const min = Math.min(...points.map(p => p.value));
                                     const max = Math.max(...points.map(p => p.value));
-                                    const range = max - min || 1;
+                                    const range = (max - min) || 1;
 
                                     // Calculate path
                                     const coords = points.map((p, i) => {

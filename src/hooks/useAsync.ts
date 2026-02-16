@@ -1,13 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { queryCache } from '../lib/cache';
+
+interface UseAsyncOptions {
+    cacheKey?: string;
+    ttl?: number; // Time to live in ms
+    keepPreviousData?: boolean;
+}
 
 export function useAsync<T>(
     asyncFunction: () => Promise<T>,
-    deps: React.DependencyList = []
+    deps: React.DependencyList = [],
+    options: UseAsyncOptions = {}
 ) {
-    const [data, setData] = useState<T | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { cacheKey, ttl, keepPreviousData } = options;
+
+    // Initialize state from cache if available
+    const [data, setData] = useState<T | null>(() => {
+        if (cacheKey) {
+            const cached = queryCache.get<T>(cacheKey);
+            return cached || null;
+        }
+        return null;
+    });
+
+    // Loading is true only if we have no data and no error
+    const [loading, setLoading] = useState(() => {
+        if (cacheKey && queryCache.get(cacheKey)) return false;
+        return true;
+    });
+
     const [error, setError] = useState<Error | null>(null);
     const [version, setVersion] = useState(0);
+    const lastFetchId = useRef(0);
 
     const refresh = useCallback(() => {
         setVersion(v => v + 1);
@@ -15,29 +39,47 @@ export function useAsync<T>(
 
     useEffect(() => {
         let mounted = true;
+        const fetchId = ++lastFetchId.current;
 
         const execute = async () => {
             try {
-                setLoading(true);
+                // If we have cached data, we don't need to set loading to true immediately
+                // This creates the "stale-while-revalidate" effect
+                if (!data || !cacheKey) {
+                    setLoading(true);
+                }
+
                 const result = await asyncFunction();
-                if (mounted) {
+
+                if (mounted && fetchId === lastFetchId.current) {
                     setData(result);
                     setError(null);
+
+                    // Update cache
+                    if (cacheKey) {
+                        queryCache.set(cacheKey, result, ttl);
+                    }
                 }
             } catch (err) {
-                if (mounted) {
+                if (mounted && fetchId === lastFetchId.current) {
                     setError(err instanceof Error ? err : new Error(String(err)));
                 }
             } finally {
-                if (mounted) {
+                if (mounted && fetchId === lastFetchId.current) {
                     setLoading(false);
                 }
             }
         };
 
+        // If we have a cache key, check if we need to fetch at all or just revalidate
+        // For now, simpler SWR: always fetch to revalidate
         execute();
 
         const handleDbUpdate = () => {
+            // Invalidate cache on massive DB updates to force UI refresh
+            if (cacheKey) {
+                queryCache.invalidate(cacheKey);
+            }
             execute();
         };
         window.addEventListener('db-updated', handleDbUpdate);
@@ -46,7 +88,8 @@ export function useAsync<T>(
             mounted = false;
             window.removeEventListener('db-updated', handleDbUpdate);
         };
-    }, [...deps, version]);
+    }, [...deps, version, cacheKey, ttl]);
 
     return { data, loading, error, refresh };
 }
+

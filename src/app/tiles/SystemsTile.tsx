@@ -4,16 +4,27 @@ import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useNavigate } from 'react-router-dom';
 import type { SystemRecord } from '../../types';
 import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
-
+import { Skeleton } from '../components/ui/Skeleton';
 
 export const SystemsTile: React.FC = () => {
     const navigate = useNavigate();
     const { data: systems, loading, error } = useAsync<SystemRecord[]>(
         () => SystemRepository.getFavorites(),
-        []
+        [],
+        { cacheKey: 'tile-systems-favorites', ttl: 10 * 60 * 1000 }
     );
 
-    if (loading && !systems) return <div className="p-4 text-center text-slate-400 animate-pulse">Loading favorites...</div>;
+    if (loading && !systems) return (
+        <div className="flex flex-col h-full gap-2 p-1 pr-2">
+            <Skeleton className="h-14 rounded-xl" />
+            <Skeleton className="h-14 rounded-xl" />
+            <Skeleton className="h-14 rounded-xl" />
+            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-4 w-12 rounded-full" />
+            </div>
+        </div>
+    );
     if (error) return <div className="p-4 text-center text-red-500 text-xs text-wrap">Error: {error.message}</div>;
 
     const getStatusIcon = (status: string) => {
