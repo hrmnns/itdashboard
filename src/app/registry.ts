@@ -5,6 +5,7 @@ import { ItForecastTile } from './tiles/ItForecastTile';
 import { ClockTile } from './tiles/ClockTile';
 import { DataInspectorTile } from './tiles/DataInspectorTile';
 import { AnomalyRadarTile } from './tiles/AnomalyRadarTile';
+import { WorklistTile } from './components/WorklistTile';
 
 export const TILE_COMPONENTS: Record<string, React.ComponentType<any>> = {
     'ItCostsTile': ItCostsTile,
@@ -13,6 +14,7 @@ export const TILE_COMPONENTS: Record<string, React.ComponentType<any>> = {
     'ClockTile': ClockTile,
     'DataInspectorTile': DataInspectorTile,
     'AnomalyRadarTile': AnomalyRadarTile,
+    'WorklistTile': WorklistTile,
 };
 
 export const getTileComponent = (name: string): React.ComponentType<any> | null => {

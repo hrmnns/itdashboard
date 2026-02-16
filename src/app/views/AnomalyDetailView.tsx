@@ -5,6 +5,7 @@ import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { ShieldAlert, TrendingUp, AlertTriangle, PlusCircle, FileText, Calendar, Wallet } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import type { InvoiceItem, Anomaly, InvoiceItemHistory } from '../../types';
 
 interface AnomalyDetailViewProps {
     anomalyId: string; // DocumentId
@@ -14,9 +15,9 @@ interface AnomalyDetailViewProps {
 }
 
 export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId, period, onBack, onOpenInvoice }) => {
-    const [selectedHistory, setSelectedHistory] = useState<{ items: any[], index: number } | null>(null);
+    const [selectedHistory, setSelectedHistory] = useState<{ items: InvoiceItem[], index: number } | null>(null);
     // 1. Fetch the specific anomaly details
-    const { data: anomalies, loading } = useQuery(`
+    const { data: anomalies, loading } = useQuery<Anomaly>(`
         SELECT * FROM view_anomalies 
         WHERE DocumentId = ? AND Period = ?
     `, [anomalyId, period]);
@@ -25,9 +26,11 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
 
     // 2. Fetch Report / History for this item (Context)
     // We match by VendorName and Description to find the same "Item" over time
-    const { data: historyData } = useQuery(`
+    // 2. Fetch Report / History for this item (Context)
+    // We match by VendorName and Description to find the same "Item" over time
+    const { data: historyData } = useQuery<InvoiceItemHistory>(`
         SELECT 
-            Period, 
+            Period,
             SUM(Amount) as Amount, 
             COUNT(*) as RecordCount,
             MAX(id) as id,
@@ -60,7 +63,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
         // OR better: we adjust the history query to potentially include more data if needed.
         // ACTUALLY: Let's fetch the data.
         try {
-            const results = await runQuery(sql, params);
+            const results = await runQuery(sql, params) as InvoiceItem[];
             if (results && results.length > 0) {
                 setSelectedHistory({ items: results, index: 0 });
             }
@@ -152,7 +155,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
                     <div>
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Item Details</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2" title={anomaly.Description}>
+                        <div className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2" title={anomaly.Description ?? undefined}>
                             {anomaly.Description}
                         </div>
                         <div className="flex items-center gap-2 mt-2 text-sm text-slate-500">
@@ -369,6 +372,7 @@ export const AnomalyDetailView: React.FC<AnomalyDetailViewProps> = ({ anomalyId,
                 items={selectedHistory?.items || []}
                 initialIndex={selectedHistory?.index || 0}
                 title="Historischer Datensatz"
+                tableName="invoice_items"
             />
         </div>
     );

@@ -1,8 +1,8 @@
-import { Shell } from './app/Shell';
+import { AppRouter } from './router';
 
 function App() {
   return (
-    <Shell />
+    <AppRouter />
   );
 }
 

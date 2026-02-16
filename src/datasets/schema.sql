@@ -56,3 +56,14 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS worklist (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_table TEXT NOT NULL,
+  source_id INTEGER NOT NULL,
+  display_label TEXT,
+  display_context TEXT,
+  added_at TEXT DEFAULT (datetime('now')),
+  status TEXT DEFAULT 'open',
+  UNIQUE(source_table, source_id)
+);

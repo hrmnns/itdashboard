@@ -1,14 +1,16 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
+import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
 
-interface AnomalyRadarTileProps {
-    onNavigate: (view: any) => void;
-}
 
-export const AnomalyRadarTile: React.FC<AnomalyRadarTileProps> = ({ onNavigate }) => {
+import type { Anomaly } from '../../types';
+
+
+export const AnomalyRadarTile: React.FC = () => {
+    const navigate = useNavigate();
     // Fetch top 3 critical anomalies from the latest period
-    const { data: anomalies, loading } = useQuery(`
+    const { data: anomalies, loading } = useQuery<Anomaly>(`
         SELECT * FROM view_anomalies 
         ORDER BY RiskScore DESC, Period DESC 
         LIMIT 3
@@ -41,7 +43,7 @@ export const AnomalyRadarTile: React.FC<AnomalyRadarTileProps> = ({ onNavigate }
                     <h3 className="font-bold text-slate-700 dark:text-white">Anomaly Radar</h3>
                 </div>
                 <button
-                    onClick={() => onNavigate({ id: 'anomaly-detection' })}
+                    onClick={() => navigate('/anomalies')}
                     className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
                 >
                     View All <ArrowRight className="w-3 h-3" />
@@ -59,7 +61,7 @@ export const AnomalyRadarTile: React.FC<AnomalyRadarTileProps> = ({ onNavigate }
                     topRisks.map((risk, i) => (
                         <div
                             key={i}
-                            onClick={() => onNavigate({ id: 'anomaly-detection' })}
+                            onClick={() => navigate('/anomalies')}
                             className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700"
                         >
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${getRiskColor(risk.RiskScore)}`}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { runQuery } from '../../lib/db';
+import type { SystemRecord } from '../../types';
 import {
     Plus, Save, RefreshCw, HelpCircle, CheckCircle2, XCircle,
     Globe2, ShieldCheck, Cpu, ExternalLink, Star, ArrowLeft, Search, Filter, Settings
@@ -22,14 +23,16 @@ import {
     rectSortingStrategy
 } from '@dnd-kit/sortable';
 import { SortableSystemCard } from './SortableSystemCard';
-import { ExportFAB } from '../../components/ui/ExportFAB';
+import { ExportFAB } from '../components/ui/ExportFAB';
 
 interface SystemsManagementViewProps {
     onBack: () => void;
 }
 
 export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ onBack }) => {
-    const { data: systems, loading, refresh } = useQuery('SELECT * FROM systems ORDER BY sort_order ASC, name ASC');
+    const { data: systems, loading, refresh } = useQuery<SystemRecord>(
+        'SELECT * FROM systems ORDER BY sort_order ASC, name ASC'
+    );
     const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
     const [isScanning, setIsScanning] = React.useState(false);
@@ -44,7 +47,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         const fetchSettings = async () => {
             const result = await runQuery("SELECT value FROM settings WHERE key = 'webhook_url'");
             if (result && result.length > 0) {
-                setWebhookUrl(result[0].value);
+                setWebhookUrl(result[0].value as string);
             }
         };
         fetchSettings();
@@ -82,7 +85,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         })
     );
 
-    const filteredSystems = systems?.filter((s: any) => {
+    const filteredSystems = systems?.filter((s: SystemRecord) => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = categoryFilter === 'All' || s.category === categoryFilter;
         return matchesSearch && matchesCategory;
@@ -113,7 +116,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                     resolve('online');
                 };
 
-                const probeUrl = new URL('/favicon.ico', system.url).href;
+                const probeUrl = new URL('/favicon.ico', system.url!).href;
                 img.src = `${probeUrl}?t=${Date.now()}`;
             });
 
@@ -133,8 +136,8 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         const { active, over } = event;
 
         if (over && active.id !== over.id && systems) {
-            const oldIndex = systems.findIndex((s: any) => s.id.toString() === active.id);
-            const newIndex = systems.findIndex((s: any) => s.id.toString() === over.id);
+            const oldIndex = systems.findIndex((s: SystemRecord) => s.id.toString() === active.id);
+            const newIndex = systems.findIndex((s: SystemRecord) => s.id.toString() === over.id);
 
             const newSystems = arrayMove(systems, oldIndex, newIndex);
 
@@ -159,7 +162,7 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
         setIsSaving(true);
         try {
             const nextOrder = systems && systems.length > 0
-                ? Math.max(...systems.map((s: any) => s.sort_order)) + 1
+                ? Math.max(...systems.map((s: SystemRecord) => s.sort_order)) + 1
                 : 0;
 
             await runQuery(
@@ -361,10 +364,10 @@ export const SystemsManagementView: React.FC<SystemsManagementViewProps> = ({ on
                         <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-bold">Loading Infrastructure Data...</div>
                     ) : (
                         <SortableContext
-                            items={filteredSystems?.map((s: any) => s.id.toString()) || []}
+                            items={filteredSystems?.map((s: SystemRecord) => s.id.toString()) || []}
                             strategy={rectSortingStrategy}
                         >
-                            {filteredSystems?.map((system: any) => (
+                            {filteredSystems?.map((system: SystemRecord) => (
                                 <SortableSystemCard key={system.id} id={system.id}>
                                     <div
                                         className={`h-full group relative p-6 bg-white dark:bg-slate-900 rounded-[32px] border transition-all duration-300 flex flex-col gap-4 ${scanningId === system.id ? 'border-blue-400 ring-4 ring-blue-50' : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl'}`}

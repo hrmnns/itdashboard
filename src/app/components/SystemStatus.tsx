@@ -8,7 +8,7 @@ interface SystemStatusProps {
 }
 
 export const SystemStatus: React.FC<SystemStatusProps> = ({ isCollapsed }) => {
-    const { data: countData, loading, refresh } = useQuery(`
+    const { data: countData, loading, refresh } = useQuery<{ kpis: number, invoices: number, events: number }>(`
         SELECT 
             (SELECT count(*) FROM kpi_data) as kpis,
             (SELECT count(*) FROM invoice_items) as invoices,

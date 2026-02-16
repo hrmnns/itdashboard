@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import type { TileSize } from '../types';
 import { clsx, type ClassValue } from 'clsx';
@@ -26,14 +27,14 @@ interface SortableTileProps {
     title: string;
     size: TileSize;
     targetView?: string;
-    onNavigate: (view: any) => void;
     onRemove?: (id: string) => void;
     children: React.ReactNode;
 }
 
 export const SortableTile: React.FC<SortableTileProps> = ({
-    id, title, size, targetView, onNavigate, onRemove, children
+    id, title, size, targetView, onRemove, children
 }) => {
+    const navigate = useNavigate();
     const {
         attributes,
         listeners,
@@ -60,7 +61,7 @@ export const SortableTile: React.FC<SortableTileProps> = ({
                 )}
                 {...attributes}
                 {...listeners}
-                onClick={() => targetView && onNavigate(targetView)}
+                onClick={() => targetView && navigate(targetView)}
             >
                 <div className="h-full">
                     {children}

@@ -6,22 +6,23 @@ import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import { RecordComparison } from '../components/ui/RecordComparison';
+import type { InvoiceItem } from '../../types';
 
 interface ItCostsItemHistoryViewProps {
-    item: any;
+    item: InvoiceItem;
     onBack: () => void;
 }
 
 export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ item: referenceItem, onBack }) => {
-    const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [selectedItem, setSelectedItem] = useState<InvoiceItem | null>(null);
     const [showRawDetails, setShowRawDetails] = useState(false);
 
     // Retrieve custom key fields
     const keyFields = useMemo(() => {
         try {
             const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
-            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
-            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+            const firstMappingWithKeys = Object.values(savedMappings as Record<string, Record<string, unknown>>).find(m => m.__keyFields);
+            return (firstMappingWithKeys?.__keyFields as string[] | undefined) || ['DocumentId', 'LineId'];
         } catch (e) {
             return ['DocumentId', 'LineId'];
         }
@@ -30,12 +31,12 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     // Build dynamic SQL with all key fields to track THIS specific item identity over time
     const sql = useMemo(() => {
         const conditions: string[] = [];
-        const params: any[] = [];
+        const params: (string | number)[] = [];
 
         keyFields.forEach((field: string) => {
             if (referenceItem[field] !== undefined && referenceItem[field] !== null) {
                 conditions.push(`${field} = ?`);
-                params.push(referenceItem[field]);
+                params.push(referenceItem[field] as string | number);
             } else {
                 conditions.push(`${field} IS NULL`);
             }
@@ -47,14 +48,14 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
         };
     }, [referenceItem, keyFields]);
 
-    const { data, loading, error } = useQuery(sql.query, sql.params);
+    const { data, loading, error } = useQuery<InvoiceItem>(sql.query, sql.params);
 
     const history = data || [];
 
     // 1. Detect ambiguity (multiple records per period for the same primary key)
     const ambiguityMap = useMemo(() => {
         const counts: Record<string, number> = {};
-        history.forEach((i: any) => counts[i.Period] = (counts[i.Period] || 0) + 1);
+        history.forEach((i: InvoiceItem) => counts[i.Period] = (counts[i.Period] || 0) + 1);
         return counts;
     }, [history]);
 
@@ -63,9 +64,9 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     // 2. Separate "Past", "Current", and "Future" records
     const referencePeriod = referenceItem.Period;
     const records = useMemo(() => {
-        return history.map((i: any) => {
-            const currentId = i.id ?? i.ID;
-            const referenceId = referenceItem.id ?? referenceItem.ID;
+        return history.map((i: InvoiceItem) => {
+            const currentId = i.id;
+            const referenceId = referenceItem.id;
             const isMatch = currentId !== undefined && currentId !== null && currentId === referenceId;
 
             return {
@@ -84,8 +85,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     }, [records]);
 
     const referenceIndex = useMemo(() => {
-        const refId = referenceItem.id ?? referenceItem.ID;
-        return sortedRecords.findIndex((r: any) => (r.id ?? r.ID) === refId);
+        const refId = referenceItem.id;
+        return sortedRecords.findIndex((r: InvoiceItem) => r.id === refId);
     }, [sortedRecords, referenceItem]);
 
 
@@ -93,11 +94,11 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     // 3. Advanced Metrics (Avg, Stability, Volatility)
     const metrics = useMemo(() => {
         if (history.length === 0) return null;
-        const total = history.reduce((acc: number, i: any) => acc + i.Amount, 0);
+        const total = history.reduce((acc: number, i: InvoiceItem) => acc + i.Amount, 0);
         const avg = total / history.length;
 
         // Simple variance/stability score
-        const sqDiffs = history.map((i: any) => Math.pow(i.Amount - avg, 2));
+        const sqDiffs = history.map((i: InvoiceItem) => Math.pow(i.Amount - avg, 2));
         const variance = sqDiffs.reduce((a, b) => a + b, 0) / history.length;
         const stdDev = Math.sqrt(variance);
         const volatility = avg > 0 ? (stdDev / avg) * 100 : 0; // Coefficient of variation
@@ -121,7 +122,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
 
     // Timeline Component
-    const TimelineItem = ({ record }: { record: any, previousRecord?: any }) => {
+    const TimelineItem = ({ record }: { record: InvoiceItem & { isFuture: boolean; isCurrent: boolean; isPast: boolean; isAmbiguousInPeriod: boolean }, previousRecord?: InvoiceItem }) => {
         // Delta now relative to the REFERENCE item, not the previous month
         const delta = record.Amount - referenceItem.Amount;
         const deltaPercent = referenceItem.Amount !== 0 ? (delta / Math.abs(referenceItem.Amount)) * 100 : 0;
@@ -170,7 +171,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                             </div>
                             <div className="flex items-center gap-1.5 opacity-40">
                                 <span className="text-[9px] uppercase font-black px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
-                                    ID: {record.id || record.ID}
+                                    ID: {record.id}
                                 </span>
                             </div>
                         </div>
@@ -291,7 +292,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                         <div className="space-y-[3px]">
                             {records.sort((a, b) => b.Period.localeCompare(a.Period)).map((rec, idx, arr) => (
                                 <TimelineItem
-                                    key={`${rec.Period}-${rec.id || rec.ID || idx}-${idx}`}
+                                    key={`${rec.Period}-${rec.id}-${idx}`}
                                     record={rec}
                                     previousRecord={arr[idx + 1]}
                                 />
@@ -311,7 +312,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
                         <div className="grid grid-cols-1 gap-5 relative z-10">
                             {[
-                                { label: 'Internal DB ID', value: referenceItem?.id || referenceItem?.ID, icon: AlertCircle },
+                                { label: 'Internal DB ID', value: referenceItem?.id, icon: AlertCircle },
                                 { label: 'Dokument ID', value: referenceItem?.DocumentId, icon: Receipt },
                                 { label: 'Line ID', value: referenceItem?.LineId, icon: Layers },
                                 { label: 'Period', value: referenceItem?.Period, icon: Info },
@@ -379,6 +380,7 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                 items={sortedRecords}
                 initialIndex={referenceIndex >= 0 ? referenceIndex : 0}
                 title="Datensatz-Details"
+                tableName="invoice_items"
             />
         </div>
     );

@@ -8,7 +8,13 @@ export const ItForecastTile: React.FC = () => {
     const currentMonth = today.getMonth() + 1;
 
     // Fetch YTD stats for current year AND the latest available year
-    const { data: stats, loading, error } = useQuery(`
+    const { data: stats, loading, error } = useQuery<{
+        latestYear: number;
+        totalLatest: number;
+        monthsLatest: number;
+        totalCurrent: number;
+        monthsCurrent: number;
+    }>(`
         WITH LatestYear AS (SELECT MAX(FiscalYear) as yr FROM invoice_items)
         SELECT 
             (SELECT yr FROM LatestYear) as latestYear,

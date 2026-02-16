@@ -2,10 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { Search, Receipt, Calendar, TrendingUp, PlusCircle, AlertTriangle, Copy, ShieldCheck, Box, FileText, Layers } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
-import { ExportFAB } from '../../components/ui/ExportFAB';
+import { ExportFAB } from '../components/ui/ExportFAB';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import * as XLSX from 'xlsx';
+import type { InvoiceItem } from '../../types';
+
+/** Grouped invoice structure for the month view */
+interface InvoiceGroup {
+    DocumentId: string;
+    PostingDate: string;
+    VendorName: string | null;
+    VendorId: string | null;
+    total_amount: number;
+    items: InvoiceItem[];
+    primary_description: string | null;
+    newItemsCount: number;
+    amountChangedCount: number;
+    ambiguousCount: number;
+}
 
 interface ItCostsMonthViewProps {
     period: string;
@@ -30,33 +45,32 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
     // Retrieve custom key fields from saved mappings
-    const keyFields = useMemo(() => {
+    const keyFields: string[] = useMemo(() => {
         try {
-            const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
-            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
-            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+            const savedMappings: Record<string, Record<string, unknown>> = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
+            const firstMappingWithKeys = Object.values(savedMappings).find(m => m.__keyFields);
+            return (firstMappingWithKeys?.__keyFields as string[] | undefined) || ['DocumentId', 'LineId'];
         } catch (e) {
             return ['DocumentId', 'LineId'];
         }
     }, []);
 
     // Fetch current month invoices
-    const { data: currentMonthData, loading: loadingCurrent } = useQuery(`
-        SELECT * FROM invoice_items WHERE Period = '${period}'
-    `);
+    const { data: currentItems, loading: loadingCurrent } = useQuery<InvoiceItem>(
+        'SELECT * FROM invoice_items WHERE Period = ? ORDER BY DocumentId, LineId',
+        [period]
+    );
 
-    // Fetch previous month items for comparison
-    const { data: previousMonthData, loading: loadingPrevious } = useQuery(`
-        SELECT * FROM invoice_items WHERE Period = '${previousPeriod}'
-    `);
-
-    const currentItems = currentMonthData || [];
-    const previousItems = previousMonthData || [];
+    // Fetch previous period for comparison
+    const { data: previousItems, loading: loadingPrevious } = useQuery<InvoiceItem>(
+        'SELECT * FROM invoice_items WHERE Period = ? ORDER BY DocumentId, LineId',
+        [previousPeriod]
+    );
 
     // Intra-month duplicate detection (ambiguity check)
     const keyFrequency = useMemo(() => {
         const freq: Record<string, number> = {};
-        currentItems.forEach((item: any) => {
+        currentItems.forEach((item: InvoiceItem) => {
             const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
             freq[compositeKey] = (freq[compositeKey] || 0) + 1;
         });
@@ -65,8 +79,8 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
 
     // Fast lookup for previous month items
     const prevItemMap = useMemo(() => {
-        const map = new Map<string, any>();
-        previousItems.forEach((p: any) => {
+        const map = new Map<string, InvoiceItem>();
+        previousItems.forEach((p: InvoiceItem) => {
             const key = keyFields.map((f: string) => String(p[f] || '').trim()).join('|');
             map.set(key, p);
         });
@@ -83,7 +97,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
     const invoices = (() => {
         const grouped = new Map<string, any>();
 
-        currentItems.forEach((item: any) => {
+        currentItems.forEach((item: InvoiceItem) => {
             if (!grouped.has(item.DocumentId)) {
                 grouped.set(item.DocumentId, {
                     DocumentId: item.DocumentId,
@@ -106,7 +120,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             let amountChangedCount = 0;
             let ambiguousCount = 0;
 
-            invoice.items.forEach((currentItem: any) => {
+            invoice.items.forEach((currentItem: InvoiceItem) => {
                 const compositeKey = keyFields.map((f: string) => String(currentItem[f] || '').trim()).join('|');
                 const isAmbiguous = keyFrequency[compositeKey] > 1;
 
@@ -164,11 +178,11 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         XLSX.writeFile(wb, `IT_Costs_Analysis_${period}.xlsx`);
     };
 
-    const columns: Column<any>[] = [
+    const columns: Column<InvoiceGroup>[] = [
         {
             header: 'Date / Invoice',
             accessor: 'DocumentId',
-            render: (item: any) => {
+            render: (item: InvoiceGroup) => {
                 const isAutoGenerated = item.DocumentId?.startsWith('GEN-');
                 return (
                     <div className="flex flex-col gap-0.5">
@@ -191,7 +205,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             header: 'Vendor',
             accessor: 'VendorName',
             className: 'w-[25%]',
-            render: (item: any) => (
+            render: (item: InvoiceGroup) => (
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-xs">
                         {item.VendorName?.charAt(0) ?? '?'}
@@ -202,9 +216,9 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         },
         {
             header: 'Positions',
-            accessor: (item: any) => item.items.length,
+            accessor: (item: InvoiceGroup) => item.items.length,
             align: 'center',
-            render: (item: any) => (
+            render: (item: InvoiceGroup) => (
                 <div className="flex flex-col items-center">
                     <span className="text-sm font-bold text-slate-900 dark:text-white">{item.items.length}</span>
                     <span className="text-[9px] uppercase font-black text-slate-400 tracking-tighter">Items</span>
@@ -214,7 +228,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         {
             header: 'Source',
             accessor: 'DocumentId',
-            render: (item: any) => {
+            render: (item: InvoiceGroup) => {
                 const isAutoGenerated = item.DocumentId?.startsWith('GEN-');
                 return (
                     <div className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider text-center border ${isAutoGenerated
@@ -229,7 +243,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
         {
             header: 'Anomalies',
             accessor: 'newItemsCount',
-            render: (item: any) => (
+            render: (item: InvoiceGroup) => (
                 <div className="flex gap-2">
                     {item.newItemsCount > 0 && (
                         <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-bold flex items-center gap-1" title={`${item.newItemsCount} new items`}>
@@ -262,7 +276,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             header: 'Total Amount',
             accessor: 'total_amount',
             align: 'right',
-            render: (item: any) => {
+            render: (item: InvoiceGroup) => {
                 const isCredit = item.total_amount < 0;
                 return (
                     <span className={`font-bold ${isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
@@ -276,7 +290,7 @@ export const ItCostsMonthView: React.FC<ItCostsMonthViewProps> = ({ period, onBa
             accessor: 'DocumentId',
             align: 'right',
             className: 'w-[100px] text-right sticky right-0 z-10 bg-white dark:bg-slate-800 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] dark:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.5)]',
-            render: (item: any) => (
+            render: (item: InvoiceGroup) => (
                 <button
                     onClick={(e) => {
                         e.stopPropagation();

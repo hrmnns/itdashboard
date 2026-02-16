@@ -2,16 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { Search, Receipt, AlertTriangle, PlusCircle, Copy } from 'lucide-react';
 import { DataTable, type Column } from '../../components/ui/DataTable';
-import { ExportFAB } from '../../components/ui/ExportFAB';
+import { ExportFAB } from '../components/ui/ExportFAB';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import * as XLSX from 'xlsx';
+import type { InvoiceItem } from '../../types';
 
 interface ItCostsInvoiceItemsViewProps {
     invoiceId: string;
     period: string;
     onBack: () => void;
-    onViewHistory: (item: any) => void;
+    onViewHistory: (item: InvoiceItem) => void;
 }
 
 // Helper to get previous period (assuming YYYY-MM format)
@@ -29,20 +30,28 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
     const previousPeriod = useMemo(() => getPreviousPeriod(period), [period]);
 
     // 1. Fetch current items FIRST
-    const { data: currentItemsData, loading: loadingCurrent, error } = useQuery(
-        `SELECT * FROM invoice_items WHERE DocumentId = ? AND Period = ? ORDER BY LineId ASC`,
-        [invoiceId, period]
+    const { data: items, loading: loadingCurrent, error } = useQuery<InvoiceItem>(
+        'SELECT * FROM invoice_items WHERE Period = ? AND DocumentId = ? ORDER BY LineId ASC',
+        [period, invoiceId]
     );
 
-    const items = currentItemsData || [];
+    // 3. Fetch previous month items by DocumentId ONLY (Key-Centric)
+    // We ignore VendorIds and fetch all items with the same DocumentId to find matches via keyFields.
+    const { data: previousItems, loading: loadingPrevious } = useQuery<InvoiceItem>(
+        'SELECT * FROM invoice_items WHERE Period = ? AND DocumentId IN (SELECT DocumentId FROM invoice_items WHERE Period = ? AND DocumentId = ?)',
+        [previousPeriod, period, invoiceId]
+    );
+
+    const currentItems = items || [];
+    const prevItems = previousItems || [];
 
     // 2. Retrieve keyFields (now items is safely defined)
     const keyFields = useMemo(() => {
         try {
             const savedMappings = JSON.parse(localStorage.getItem('excel_mappings_v2') || '{}');
 
-            if (items.length > 0) {
-                const currentFields = Object.keys(items[0]);
+            if (currentItems.length > 0) {
+                const currentFields = Object.keys(currentItems[0]);
                 let bestMapping = null;
                 let maxOverlap = -1;
 
@@ -58,62 +67,56 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
                 if (bestMapping) return (bestMapping as any).__keyFields;
             }
 
-            const firstMappingWithKeys = Object.values(savedMappings).find((m: any) => m.__keyFields);
-            return (firstMappingWithKeys as any)?.__keyFields || ['DocumentId', 'LineId'];
+            const firstMappingWithKeys = Object.values(savedMappings as Record<string, Record<string, unknown>>).find(m => m.__keyFields);
+            return (firstMappingWithKeys?.__keyFields as string[] | undefined) || ['DocumentId', 'LineId'];
         } catch (e) {
             return ['DocumentId', 'LineId'];
         }
-    }, [items]);
-
-    // 3. Fetch previous month items by DocumentId ONLY (Key-Centric)
-    // We ignore VendorIds and fetch all items with the same DocumentId to find matches via keyFields.
-    const prevQuery = `SELECT * FROM invoice_items WHERE Period = ? AND DocumentId = ?`;
-    const prevParams = [previousPeriod, invoiceId];
-
-    const { data: previousItemsData, loading: loadingPrevious } = useQuery(prevQuery, prevParams);
-
-    const previousItems = previousItemsData || [];
+    }, [currentItems]);
 
     // Intra-month duplicate detection (ambiguity check)
     const keyFrequency = useMemo(() => {
         const freq: Record<string, number> = {};
-        items.forEach((item: any) => {
+        currentItems.forEach((item: InvoiceItem) => {
             const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
             freq[compositeKey] = (freq[compositeKey] || 0) + 1;
         });
         return freq;
-    }, [items, keyFields]);
+    }, [currentItems, keyFields]);
 
     const enhancedItems = useMemo(() => {
-        return items.map((item: any) => {
+        return currentItems.map((item: InvoiceItem) => {
             const compositeKey = keyFields.map((f: string) => String(item[f] || '').trim()).join('|');
             const isAmbiguous = keyFrequency[compositeKey] > 1;
 
-            let match = previousItems.find((p: any) => {
-                return keyFields.every((f: string) =>
-                    String(p[f] || '').trim() === String(item[f] || '').trim()
-                );
-            });
-
             let status: 'normal' | 'new' | 'changed' | 'ambiguous' = 'normal';
-            let previousAmount = null;
+            let previousAmount: number | null = null;
 
             if (isAmbiguous) {
                 status = 'ambiguous';
-            } else if (!match) {
-                status = 'new';
             } else {
-                const diff = Math.abs(item.Amount - match.Amount);
-                const percentDiff = diff / Math.abs(match.Amount || 1);
-                if (diff > 10 && percentDiff > 0.1) {
-                    status = 'changed';
-                    previousAmount = match.Amount;
+                let match = prevItems.find((p: InvoiceItem) => {
+                    return keyFields.every((f: string) =>
+                        String(p[f] || '').trim() === String(item[f] || '').trim()
+                    );
+                });
+
+                if (match) {
+                    // Ensure match.Amount is treated as a number
+                    const matchedAmount = typeof match.Amount === 'number' ? match.Amount : 0;
+
+                    if (Math.abs(item.Amount - matchedAmount) > 0.01) { // Check for significant difference
+                        status = 'changed';
+                        previousAmount = matchedAmount;
+                    }
+                } else {
+                    status = 'new';
                 }
             }
 
             return { ...item, status, previousAmount, compositeKey };
         });
-    }, [items, previousItems, keyFields, keyFrequency]);
+    }, [currentItems, prevItems, keyFields, keyFrequency]);
 
     const anomalySummary = useMemo(() => {
         return {
@@ -131,7 +134,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
 
     if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
-    const totalAmount = items.reduce((acc: number, item: any) => acc + item.Amount, 0);
+    const totalAmount = items.reduce((acc: number, item: InvoiceItem) => acc + item.Amount, 0);
     const vendorName = items[0]?.VendorName || 'Unknown Vendor';
 
     const handleExcelExport = () => {
@@ -155,7 +158,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             header: 'Status',
             accessor: 'status',
             align: 'center',
-            render: (item: any) => {
+            render: (item: InvoiceItem) => {
                 if (item.status === 'ambiguous') return (
                     <div className="flex items-center justify-center">
                         <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-black uppercase rounded animate-pulse border border-red-200 dark:border-red-900/50 flex items-center gap-1">
@@ -190,7 +193,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
         {
             header: 'Pos / Identity',
             accessor: 'LineId',
-            render: (item: any) => (
+            render: (item: InvoiceItem) => (
                 <div className="flex flex-col">
                     <span className="text-xs font-black text-slate-700 dark:text-slate-200">#{item.LineId}</span>
                     <span className="text-[9px] font-mono text-slate-400 uppercase tracking-tighter">
@@ -202,7 +205,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
         {
             header: 'Description & Category',
             accessor: 'Description',
-            render: (item: any) => (
+            render: (item: InvoiceItem) => (
                 <div className="flex flex-col gap-0.5 max-w-md">
                     <span className="font-bold text-slate-900 dark:text-white truncate">{item.Description}</span>
                     <div className="flex items-center gap-2">
@@ -216,7 +219,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
         {
             header: 'Cost Center / G/L Account',
             accessor: 'CostCenter',
-            render: (item: any) => (
+            render: (item: InvoiceItem) => (
                 <div className="flex flex-col gap-0.5">
                     <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">{item.CostCenter}</span>
                     <span className="text-[9px] font-mono text-slate-400">Account: {item.GLAccount}</span>
@@ -227,16 +230,16 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             header: 'Amount',
             accessor: 'Amount',
             align: 'right',
-            render: (item: any) => {
+            render: (item: InvoiceItem) => {
                 const isCredit = item.Amount < 0;
                 return (
                     <div className="flex flex-col items-end">
                         <span className={`text-sm font-black ${isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
                             {isCredit ? '-' : ''}€{Math.abs(item.Amount).toLocaleString()}
                         </span>
-                        {item.status === 'changed' && (
-                            <span className={`text-[9px] font-bold flex items-center gap-0.5 ${(item.Amount - item.previousAmount) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                {(item.Amount - item.previousAmount) > 0 ? '+' : ''}{(item.Amount - item.previousAmount).toLocaleString()}€
+                        {item.status === 'changed' && item.previousAmount != null && (
+                            <span className={`text-[9px] font-bold flex items-center gap-0.5 ${(item.Amount - Number(item.previousAmount)) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                {(item.Amount - Number(item.previousAmount)) > 0 ? '+' : ''}{(item.Amount - Number(item.previousAmount)).toLocaleString()}€
                             </span>
                         )}
                     </div>
@@ -247,7 +250,7 @@ export const ItCostsInvoiceItemsView: React.FC<ItCostsInvoiceItemsViewProps> = (
             header: '',
             accessor: 'actions',
             align: 'right',
-            render: (item: any) => (
+            render: (item: InvoiceItem) => (
                 <button
                     onClick={() => onViewHistory(item)}
                     className="p-2 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 dark:hover:bg-blue-600 rounded-xl text-blue-600 dark:text-blue-400 hover:text-white dark:hover:text-white transition-all shadow-sm border border-blue-100 dark:border-blue-900/30 group"

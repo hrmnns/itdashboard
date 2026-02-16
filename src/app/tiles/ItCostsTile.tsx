@@ -2,15 +2,14 @@ import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
 import { Wallet, Users, ArrowUpRight } from 'lucide-react';
 
-interface ItCostsTileProps {
-    onNavigate?: (view: any) => void;
-}
+import type { KpiRecord, ItCostsSummary } from '../../types';
 
-export const ItCostsTile: React.FC<ItCostsTileProps> = () => {
+
+export const ItCostsTile: React.FC = () => {
     // 1. Fetch aggregates
-    const { data: summaryData, loading: summaryLoading, error: summaryError } = useQuery("SELECT * FROM it_costs_summary");
+    const { data: summaryData, loading: summaryLoading, error: summaryError } = useQuery<ItCostsSummary>("SELECT * FROM it_costs_summary");
     // 2. Fetch history for trend (last 4 months)
-    const { data: trendData, loading: trendLoading } = useQuery("SELECT * FROM kpi_history WHERE metric = 'IT Costs' AND period NOT LIKE '%-13' ORDER BY date DESC LIMIT 4");
+    const { data: trendData, loading: trendLoading } = useQuery<KpiRecord>("SELECT * FROM kpi_history WHERE metric = 'IT Costs' AND period NOT LIKE '%-13' ORDER BY date DESC LIMIT 4");
 
     if (summaryLoading || trendLoading) return <div className="p-4 text-center text-slate-500 animate-pulse">Loading costs...</div>;
     if (summaryError) return <div className="p-4 text-center text-red-500">Error: {summaryError.message}</div>;

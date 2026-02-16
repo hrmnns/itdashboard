@@ -9,6 +9,7 @@ interface RecordDetailModalProps {
     initialIndex?: number;
     title?: string;
     infoLabel?: string;
+    tableName?: string;
 }
 
 export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({

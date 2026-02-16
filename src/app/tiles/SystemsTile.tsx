@@ -1,12 +1,11 @@
 import React from 'react';
 import { useQuery } from '../../hooks/useQuery';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, HelpCircle, Globe2, ShieldCheck, Cpu, Star } from 'lucide-react';
 
-interface SystemsTileProps {
-    onNavigate: (view: any) => void;
-}
 
-export const SystemsTile: React.FC<SystemsTileProps> = ({ onNavigate }) => {
+export const SystemsTile: React.FC = () => {
+    const navigate = useNavigate();
     const { data: systems, loading, error } = useQuery('SELECT * FROM systems WHERE is_favorite = 1 ORDER BY sort_order ASC, name ASC LIMIT 4');
 
     if (loading && !systems) return <div className="p-4 text-center text-slate-400 animate-pulse">Loading favorites...</div>;
@@ -32,7 +31,7 @@ export const SystemsTile: React.FC<SystemsTileProps> = ({ onNavigate }) => {
     return (
         <div
             className="flex flex-col h-full overflow-hidden cursor-pointer group/tile relative"
-            onClick={() => onNavigate('systems-management')}
+            onClick={() => navigate('/systems')}
         >
 
             <div className="flex-1 space-y-2 pr-1 overflow-hidden pointer-events-none">

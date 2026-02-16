@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { runQuery, initDB } from '../lib/db';
+import type { DbRow } from '../types';
 
-export function useQuery<T = any>(query: string, params: any[] = []) {
+export function useQuery<T = DbRow>(query: string, params: (string | number | null | undefined)[] = []) {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -30,13 +31,13 @@ export function useQuery<T = any>(query: string, params: any[] = []) {
 
                 const result = await runQuery(query, params);
                 if (mounted) {
-                    setData(result);
+                    setData(result as T[]);
                     setError(null);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (mounted) {
                     console.error('Query error:', err);
-                    setError(err);
+                    setError(err instanceof Error ? err : new Error(String(err)));
                 }
             } finally {
                 if (mounted) {

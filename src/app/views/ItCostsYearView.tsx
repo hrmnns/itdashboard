@@ -2,6 +2,7 @@ import { useQuery } from '../../hooks/useQuery';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { SummaryCard } from '../components/ui/SummaryCard';
 import { TrendingUp, TrendingDown, DollarSign, Calendar, Filter } from 'lucide-react';
+import type { ItCostsTrend } from '../../types';
 
 interface ItCostsYearViewProps {
     onBack: () => void;
@@ -10,7 +11,7 @@ interface ItCostsYearViewProps {
 
 export const ItCostsYearView: React.FC<ItCostsYearViewProps> = ({ onBack, onDrillDown }) => {
     // Fetch last 12 months of IT Costs
-    const { data, loading, error } = useQuery(`
+    const { data, loading, error } = useQuery<ItCostsTrend>(`
         SELECT 
             Period, 
             SUM(Amount) as total,

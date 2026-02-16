@@ -3,6 +3,7 @@ import { useQuery } from '../../hooks/useQuery';
 import { Search, Filter, ArrowUpRight, PlusCircle, AlertTriangle, TrendingUp } from 'lucide-react';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
+import type { Anomaly } from '../../types';
 
 interface AnomalyDetectionViewProps {
     onBack: () => void;
@@ -14,7 +15,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
     const [filterType, setFilterType] = useState<string>('All');
 
     // Fetch all anomalies
-    const { data: anomalies, loading } = useQuery(`
+    const { data: anomalies, loading } = useQuery<Anomaly>(`
         SELECT * FROM view_anomalies 
         ORDER BY RiskScore DESC, Period DESC
     `);
@@ -24,24 +25,24 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
     const filteredItems = useMemo(() => {
         let result = items;
         if (filterType !== 'All') {
-            result = result.filter((i: any) => i.AnomalyType === filterType);
+            result = result.filter((i: Anomaly) => i.AnomalyType === filterType);
         }
         return result;
     }, [items, filterType]);
 
     const stats = useMemo(() => ({
         total: items.length,
-        critical: items.filter((i: any) => i.RiskScore >= 80).length,
-        high: items.filter((i: any) => i.RiskScore >= 50 && i.RiskScore < 80).length,
-        medium: items.filter((i: any) => i.RiskScore < 50).length
+        critical: items.filter((i: Anomaly) => i.RiskScore >= 80).length,
+        high: items.filter((i: Anomaly) => i.RiskScore >= 50 && i.RiskScore < 80).length,
+        medium: items.filter((i: Anomaly) => i.RiskScore < 50).length
     }), [items]);
 
-    const columns: Column<any>[] = [
+    const columns: Column<Anomaly>[] = [
         {
             header: 'Risk Score',
             accessor: 'RiskScore',
             align: 'center',
-            render: (item: any) => (
+            render: (item: Anomaly) => (
                 <div className="flex justify-center">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm border-2 shadow-sm ${item.RiskScore >= 80 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800' :
                         item.RiskScore >= 50 ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' :
@@ -55,7 +56,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
         {
             header: 'Anomaly Type',
             accessor: 'AnomalyType',
-            render: (item: any) => (
+            render: (item: Anomaly) => (
                 <div className="flex items-center gap-2">
                     {item.AnomalyType === 'Cost Drift' && <TrendingUp className="w-4 h-4 text-orange-500" />}
                     {item.AnomalyType === 'New Item' && <PlusCircle className="w-4 h-4 text-blue-500" />}
@@ -67,9 +68,9 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
         {
             header: 'Description / Vendor',
             accessor: 'Description',
-            render: (item: any) => (
+            render: (item: Anomaly) => (
                 <div className="flex flex-col max-w-md">
-                    <span className="font-bold text-slate-900 dark:text-white truncate" title={item.Description}>
+                    <span className="font-bold text-slate-900 dark:text-white truncate" title={item.Description ?? undefined}>
                         {item.Description}
                     </span>
                     <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -89,7 +90,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
             header: 'Impact',
             accessor: 'Amount',
             align: 'right',
-            render: (item: any) => (
+            render: (item: Anomaly) => (
                 <div className="flex flex-col items-end gap-0.5">
                     <span className="font-black text-slate-900 dark:text-white">
                         €{item.Amount.toLocaleString()}
@@ -111,7 +112,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
             header: 'Action',
             accessor: 'DocumentId',
             align: 'right',
-            render: (item: any) => (
+            render: (item: Anomaly) => (
                 <button
                     onClick={() => onDrillDown?.(item.DocumentId, item.Period)}
                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
@@ -162,7 +163,7 @@ export const AnomalyDetectionView: React.FC<AnomalyDetectionViewProps> = ({ onBa
                         </span>
                         <span className={`text-2xl font-black ${filterType === type ? 'text-blue-700 dark:text-blue-300' : 'text-slate-900 dark:text-white'
                             }`}>
-                            {type === 'All' ? stats.total : items.filter((i: any) => i.AnomalyType === type).length}
+                            {type === 'All' ? stats.total : items.filter((i: Anomaly) => i.AnomalyType === type).length}
                         </span>
                     </button>
                 ))}

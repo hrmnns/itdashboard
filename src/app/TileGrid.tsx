@@ -19,7 +19,6 @@ import {
 import { SortableTile } from './SortableTile';
 
 interface TileGridProps {
-    onNavigate: (view: any) => void;
     visibleTileIds: string[];
     tileOrder: string[];
     onOrderChange: (newOrder: string[]) => void;
@@ -27,7 +26,6 @@ interface TileGridProps {
 }
 
 export const TileGrid: React.FC<TileGridProps> = ({
-    onNavigate,
     visibleTileIds,
     tileOrder,
     onOrderChange,
@@ -85,10 +83,9 @@ export const TileGrid: React.FC<TileGridProps> = ({
                                 title={tile.title}
                                 size={tile.defaultSize}
                                 targetView={tile.targetView}
-                                onNavigate={onNavigate}
                                 onRemove={onRemoveTile}
                             >
-                                <Component onNavigate={onNavigate} />
+                                <Component />
                             </SortableTile>
                         );
                     })}

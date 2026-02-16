@@ -27,7 +27,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     useEffect(() => {
         const fetchTables = async () => {
             const result = await runQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            setTables(result.map(r => r.name));
+            setTables(result.map(r => r.name as string));
         };
         fetchTables();
     }, []);
@@ -94,8 +94,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                     <span className={item[key] < 0 ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}>
                         {new Intl.NumberFormat('de-DE', {
                             style: 'currency',
-                            currency: item.Currency || 'EUR'
-                        }).format(item[key] || 0)}
+                            currency: (item.Currency as string) || 'EUR'
+                        }).format((item[key] as number) || 0)}
                     </span>
                 ) : undefined
             };
@@ -291,6 +291,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 initialIndex={items && selectedItem ? items.indexOf(selectedItem) : 0}
                 title="Datensatz-Details"
                 infoLabel="Inspector-Daten"
+                tableName={selectedTable}
             />
 
             {/* Error Toast / Floating Alert */}

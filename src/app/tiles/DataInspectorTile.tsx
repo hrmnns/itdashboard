@@ -15,7 +15,7 @@ export const DataInspectorTile: React.FC = () => {
             let totalRecords = 0;
             for (const table of tables) {
                 const countResult = await runQuery(`SELECT count(*) as count FROM ${table.name}`);
-                totalRecords += countResult[0]?.count || 0;
+                totalRecords += (countResult[0]?.count as number) || 0;
             }
 
             setStats({
