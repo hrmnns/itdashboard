@@ -264,7 +264,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
                 isOpen={!!selectedItem}
                 onClose={() => setSelectedItem(null)}
                 items={items || []}
-                initialIndex={items && selectedItem ? items.indexOf(selectedItem) : 0}
+                initialIndex={items && selectedItem ? Math.max(0, items.indexOf(selectedItem)) : 0}
                 title="Datensatz-Details"
                 infoLabel="Inspector-Daten"
                 tableName={selectedTable}

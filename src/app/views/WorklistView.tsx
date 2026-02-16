@@ -6,7 +6,7 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { ViewHeader } from '../components/ui/ViewHeader';
 import { RecordDetailModal } from '../components/RecordDetailModal';
 import { Bookmark, ExternalLink, Trash2, Calendar, Tag } from 'lucide-react';
-import type { WorklistEntry, InvoiceItem } from '../../types';
+import type { WorklistEntry } from '../../types';
 import { InvoiceRepository } from '../../lib/repositories/InvoiceRepository';
 
 interface WorklistViewProps {
@@ -14,8 +14,8 @@ interface WorklistViewProps {
 }
 
 export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
-    const [selectedDetail, setSelectedDetail] = useState<{ table: string, id: number } | null>(null);
-    const [detailRecords, setDetailRecords] = useState<InvoiceItem[]>([]);
+    const [selectedDetailId, setSelectedDetailId] = useState<number | null>(null);
+    const [resolvedRecords, setResolvedRecords] = useState<any[]>([]);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
     // Fetch all worklist items
@@ -33,28 +33,38 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
         }
     };
 
-    const handleRowClick = async (item: WorklistEntry) => {
-        setLoadingDetail(true);
-        try {
-            // Fetch details using Repository
-            // Currently mostly supports 'invoice_items'
-            let records: InvoiceItem[] = [];
-
-            if (item.source_table === 'invoice_items') {
-                records = await InvoiceRepository.getByIdOrDocumentId(item.source_id);
-            } else {
-                console.warn(`Detail view not implemented for table: ${item.source_table}`);
-                // Fallback or generic fetch could go here if needed, but for now we enforce repo usage.
+    // Resolve all worklist items to full records for navigation
+    React.useEffect(() => {
+        const resolveAll = async () => {
+            if (!worklistItems || worklistItems.length === 0) {
+                setResolvedRecords([]);
+                return;
             }
 
-            setDetailRecords(records);
-            setSelectedDetail({ table: item.source_table, id: item.source_id });
-        } catch (err) {
-            console.error('Failed to fetch detail', err);
-            alert('Fehler beim Laden der Details.');
-        } finally {
-            setLoadingDetail(false);
-        }
+            setLoadingDetail(true);
+            try {
+                const results = await Promise.all(
+                    worklistItems.map(async (item) => {
+                        if (item.source_table === 'invoice_items') {
+                            const records = await InvoiceRepository.getByIdOrDocumentId(item.source_id);
+                            return records[0] || null;
+                        }
+                        return null;
+                    })
+                );
+                setResolvedRecords(results.filter(r => r !== null));
+            } catch (err) {
+                console.error('Failed to resolve worklist items', err);
+            } finally {
+                setLoadingDetail(false);
+            }
+        };
+
+        resolveAll();
+    }, [worklistItems]);
+
+    const handleRowClick = (item: WorklistEntry) => {
+        setSelectedDetailId(item.source_id);
     };
 
     const columns: Column<WorklistEntry>[] = [
@@ -163,12 +173,13 @@ export const WorklistView: React.FC<WorklistViewProps> = ({ onBack }) => {
             </div>
 
             <RecordDetailModal
-                isOpen={!!selectedDetail}
-                onClose={() => setSelectedDetail(null)}
-                items={detailRecords}
+                isOpen={!!selectedDetailId}
+                onClose={() => setSelectedDetailId(null)}
+                items={resolvedRecords}
+                initialIndex={resolvedRecords.findIndex(r => r.id === selectedDetailId)}
                 title="Datensatz-Prüfung"
                 infoLabel="Arbeitsvorrat"
-                tableName={selectedDetail?.table}
+                tableName="invoice_items"
             />
 
             {/* Global Loading Spinner for resolving details */}
