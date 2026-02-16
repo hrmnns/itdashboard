@@ -16,5 +16,24 @@ export const DashboardRepository = {
 
     async getRecentOperations(limit: number = 5): Promise<DbRow[]> {
         return await runQuery("SELECT * FROM operations_events ORDER BY timestamp DESC LIMIT ?", [limit]);
+    },
+
+    async getItCostsByCategory(limit: number = 3): Promise<{ category: string; amount: number }[]> {
+        return await runQuery(
+            "SELECT Category as category, SUM(Amount) as amount FROM invoice_items WHERE Category IS NOT NULL GROUP BY Category ORDER BY amount DESC LIMIT ?",
+            [limit]
+        ) as unknown as { category: string; amount: number }[];
+    },
+
+    async getItCostsMetrics(): Promise<{ totalAmount: number; vendorCount: number; avgMonthlySpend: number; monthCount: number }> {
+        const result = await runQuery(`
+            SELECT 
+                SUM(Amount) as totalAmount,
+                COUNT(DISTINCT COALESCE(NULLIF(VendorId, ''), VendorName)) as vendorCount,
+                COUNT(DISTINCT Period) as monthCount,
+                SUM(Amount) / CAST(COUNT(DISTINCT Period) AS REAL) as avgMonthlySpend
+            FROM invoice_items
+        `);
+        return result[0] as unknown as { totalAmount: number; vendorCount: number; avgMonthlySpend: number; monthCount: number };
     }
 };

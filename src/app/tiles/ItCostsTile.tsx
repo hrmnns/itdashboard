@@ -1,22 +1,25 @@
 import React from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { DashboardRepository } from '../../lib/repositories/DashboardRepository';
-import { Wallet, Users, ArrowUpRight } from 'lucide-react';
+import { Wallet, Users, Calendar, TrendingUp } from 'lucide-react';
 import { Skeleton } from '../components/ui/Skeleton';
 import { DashboardTile } from '../components/ui/DashboardTile';
-import type { KpiRecord, ItCostsSummary } from '../../types';
+import type { KpiRecord } from '../../types';
 
 export const ItCostsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: any; onClick?: () => void }> = ({ onRemove, dragHandleProps, onClick }) => {
-    const { data, loading, error } = useAsync<{ summary: ItCostsSummary | null; trend: KpiRecord[] }>(
+    const { data, loading, error } = useAsync<{
+        metrics: { totalAmount: number; vendorCount: number; avgMonthlySpend: number; monthCount: number };
+        trend: KpiRecord[];
+    }>(
         async () => {
-            const [summary, trend] = await Promise.all([
-                DashboardRepository.getItCostsSummary(),
-                DashboardRepository.getItCostsTrend()
+            const [metrics, trend] = await Promise.all([
+                DashboardRepository.getItCostsMetrics(),
+                DashboardRepository.getItCostsTrend(2)
             ]);
-            return { summary, trend };
+            return { metrics, trend };
         },
         [],
-        { cacheKey: 'it-costs-tile-combined', ttl: 5 * 60 * 1000 }
+        { cacheKey: 'it-costs-tile-stable', ttl: 5 * 60 * 1000 }
     );
 
     if (error) {
@@ -29,29 +32,24 @@ export const ItCostsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
 
     if (loading || !data) {
         return (
-            <div className="flex flex-col h-full gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                    <Skeleton className="h-[72px] rounded-xl" />
-                    <Skeleton className="h-[72px] rounded-xl" />
-                </div>
-                <Skeleton className="flex-1 rounded-xl" />
+            <div className="grid grid-cols-2 grid-rows-2 h-full gap-3 p-1">
+                <Skeleton className="rounded-xl" />
+                <Skeleton className="rounded-xl" />
+                <Skeleton className="rounded-xl" />
+                <Skeleton className="rounded-xl" />
             </div>
         );
     }
 
-    const { summary, trend: trendData } = data;
-    const displaySummary = summary || { total_amount: 0, active_vendors: 0, latest_date: 'N/A', latest_year: 0 };
+    const { metrics } = data;
 
-    let trendPercent = 0;
-    let isTrendUp = false;
-    if (trendData && trendData.length >= 2) {
-        const latest = trendData[0].value;
-        const previous = trendData[1].value;
-        if (previous > 0) {
-            trendPercent = ((latest - previous) / previous) * 100;
-            isTrendUp = latest > previous;
-        }
-    }
+    const formatCurrency = (val: number, compact = false) =>
+        new Intl.NumberFormat('de-DE', {
+            style: 'currency',
+            currency: 'EUR',
+            maximumFractionDigits: 0,
+            notation: compact ? 'compact' : 'standard'
+        }).format(val);
 
     return (
         <DashboardTile
@@ -62,72 +60,49 @@ export const ItCostsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
             dragHandleProps={dragHandleProps}
             onClick={onClick}
         >
-            <div className="flex flex-col gap-3">
-                {/* Top Metrics Row */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
-                            <Wallet className="w-3.5 h-3.5" />
-                            <span className="text-[9px] uppercase font-bold tracking-wider">Total</span>
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-white leading-none">
-                            €{displaySummary.total_amount?.toLocaleString()}
-                        </div>
+            <div className="grid grid-cols-2 grid-rows-2 h-full gap-4">
+                {/* Top Left: Total Spend */}
+                <div className="flex flex-col justify-center">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">
+                        <Wallet className="w-3 h-3" />
+                        <span>Gesamt YTD</span>
                     </div>
-
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 mb-1">
-                            <Users className="w-3.5 h-3.5" />
-                            <span className="text-[9px] uppercase font-bold tracking-wider">Vendors</span>
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-white leading-none">
-                            {displaySummary.active_vendors}
-                        </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums leading-none">
+                        {formatCurrency(metrics.totalAmount, true)}
                     </div>
                 </div>
 
-                {/* Trend Indicator Section */}
-                <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2">
-                        <div className={`p-1.5 rounded-lg ${isTrendUp ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {isTrendUp ? <ArrowUpRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4 rotate-90" />}
-                        </div>
-                        <div>
-                            <div className={`text-base font-black ${isTrendUp ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {isTrendUp ? '+' : ''}{trendPercent.toFixed(1)}%
-                            </div>
-                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">vs. Vorimonat</div>
-                        </div>
+                {/* Top Right: Monthly Average */}
+                <div className="flex flex-col justify-center">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">
+                        <TrendingUp className="w-3 h-3" />
+                        <span>Ø Monat</span>
                     </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums leading-none">
+                        {formatCurrency(metrics.avgMonthlySpend, true)}
+                    </div>
+                </div>
 
-                    {/* Sparkline Canvas */}
-                    {trendData && trendData.length >= 2 && (
-                        <div className="w-16 h-8">
-                            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-                                {(() => {
-                                    const points = [...trendData].reverse();
-                                    const min = Math.min(...points.map(p => p.value));
-                                    const max = Math.max(...points.map(p => p.value));
-                                    const range = (max - min) || 1;
-                                    const coords = points.map((p, i) => {
-                                        const x = (i / (points.length - 1)) * 100;
-                                        const y = 40 - ((p.value - min) / range) * 30 - 5;
-                                        return `${x},${y}`;
-                                    });
-                                    return (
-                                        <path
-                                            d={`M ${coords.join(' L ')}`}
-                                            fill="none"
-                                            stroke={isTrendUp ? '#ef4444' : '#10b981'}
-                                            strokeWidth="3"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    );
-                                })()}
-                            </svg>
-                        </div>
-                    )}
+                {/* Bottom Left: Vendors */}
+                <div className="flex flex-col justify-center border-t border-slate-100 dark:border-slate-800/50 pt-2">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                        <Users className="w-3 h-3" />
+                        <span>Lieferanten</span>
+                    </div>
+                    <div className="text-xl font-black text-slate-700 dark:text-slate-300 leading-none">
+                        {metrics.vendorCount}
+                    </div>
+                </div>
+
+                {/* Bottom Right: Months Sample */}
+                <div className="flex flex-col justify-center border-t border-slate-100 dark:border-slate-800/50 pt-2">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>Zeitraum</span>
+                    </div>
+                    <div className="text-xl font-black text-slate-700 dark:text-slate-300 leading-none">
+                        {metrics.monthCount} Monate
+                    </div>
                 </div>
             </div>
         </DashboardTile>
