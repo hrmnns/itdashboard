@@ -11,8 +11,6 @@ function cn(...inputs: ClassValue[]) {
 interface DashboardTileProps {
     /** Tile title shown in the header */
     title: string;
-    /** Optional secondary label or status text */
-    subtitle?: string;
     /** Lucide icon to display in the header */
     icon: LucideIcon;
     /** Color theme for the icon background (e.g., 'blue', 'amber', 'emerald') */
@@ -37,7 +35,6 @@ interface DashboardTileProps {
 
 export const DashboardTile: React.FC<DashboardTileProps> = ({
     title,
-    subtitle,
     icon: Icon,
     iconColor = 'blue',
     children,
@@ -82,7 +79,7 @@ export const DashboardTile: React.FC<DashboardTileProps> = ({
             <div
                 {...dragHandleProps}
                 className={cn(
-                    "relative flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-700/50",
+                    "relative flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/20",
                     dragHandleProps && "cursor-grab active:cursor-grabbing"
                 )}
             >
@@ -99,11 +96,6 @@ export const DashboardTile: React.FC<DashboardTileProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {subtitle && (
-                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter">
-                            {subtitle}
-                        </span>
-                    )}
                     {onRemove && (
                         <button
                             onClick={(e) => {
@@ -133,7 +125,7 @@ export const DashboardTile: React.FC<DashboardTileProps> = ({
 
             {/* Footer Section */}
             {(footerLeft || footerRight || onClick) && (
-                <div className="relative mt-auto flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-700/50">
+                <div className="relative mt-auto flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/20">
                     <div className="flex-1 min-w-0">
                         {footerLeft}
                     </div>

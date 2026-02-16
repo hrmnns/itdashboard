@@ -26,7 +26,6 @@ export const AnomalyRadarTile: React.FC<{ onRemove?: () => void; dragHandleProps
     return (
         <DashboardTile
             title="Anomaly Radar"
-            subtitle="Risiko-Analyse"
             icon={ShieldAlert}
             iconColor="rose"
             onClick={onClick}

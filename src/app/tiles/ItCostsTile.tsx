@@ -56,7 +56,6 @@ export const ItCostsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
     return (
         <DashboardTile
             title="IT Kosten"
-            subtitle={`Laufzeit: ${displaySummary.latest_year}`}
             icon={Wallet}
             iconColor="blue"
             onRemove={onRemove}

@@ -26,7 +26,6 @@ export const DataInspectorTile: React.FC<{ onRemove?: () => void; dragHandleProp
     return (
         <DashboardTile
             title="Database Inspector"
-            subtitle="Struktur & Daten"
             icon={Database}
             iconColor="indigo"
             onClick={onClick}

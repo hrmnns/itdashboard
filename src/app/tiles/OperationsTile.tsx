@@ -17,7 +17,6 @@ export const OperationsTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
     return (
         <DashboardTile
             title="Performance"
-            subtitle="Events"
             icon={Activity}
             iconColor="emerald"
             onClick={onClick}

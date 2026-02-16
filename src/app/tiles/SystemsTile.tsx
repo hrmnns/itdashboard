@@ -43,7 +43,6 @@ export const SystemsTile: React.FC<{ onRemove?: () => void; dragHandleProps?: an
     return (
         <DashboardTile
             title="Systeme & Health"
-            subtitle="Favoriten"
             icon={Server}
             iconColor="slate"
             onClick={onClick}

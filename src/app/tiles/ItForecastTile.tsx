@@ -52,7 +52,6 @@ export const ItForecastTile: React.FC<{ onRemove?: () => void; dragHandleProps?:
     return (
         <DashboardTile
             title="Budget Forecast"
-            subtitle={isCurrentYear ? `Projektion ${analysisYear}` : `Run-Rate ${analysisYear} (Ref)`}
             icon={TrendingUp}
             iconColor="blue"
             onClick={onClick}
