@@ -12,7 +12,7 @@ export function useAsync<T>(
     deps: React.DependencyList = [],
     options: UseAsyncOptions = {}
 ) {
-    const { cacheKey, ttl, keepPreviousData } = options;
+    const { cacheKey, ttl } = options;
 
     // Initialize state from cache if available
     const [data, setData] = useState<T | null>(() => {

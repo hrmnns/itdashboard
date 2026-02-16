@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSortable } from '@dnd-kit/sortable';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
 import type { TileSize } from '../types';
@@ -13,19 +13,15 @@ function cn(...inputs: ClassValue[]) {
 const getSizeClass = (size: TileSize) => {
     switch (size) {
         case 'large':
-            // 2x2 unit
             return 'col-span-1 md:col-span-2 row-span-2';
         case 'medium':
-            // 2x1 units (wide)
             return 'col-span-1 md:col-span-2';
         case 'small':
-            // 1x1 unit
             return 'col-span-1';
         default:
             return 'col-span-1';
     }
 };
-
 
 interface SortableTileProps {
     id: string;
@@ -40,24 +36,32 @@ export const SortableTile: React.FC<SortableTileProps> = ({
     id, size, targetView, onRemove, children
 }) => {
     const navigate = useNavigate();
+
+    // Use Draggable for movement
     const {
         attributes,
         listeners,
-        setNodeRef,
+        setNodeRef: setDraggableRef,
         transform,
-        transition,
         isDragging
-    } = useSortable({ id });
+    } = useDraggable({ id });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : 0,
-        opacity: isDragging ? 0.4 : 1,
+    // Also use Droppable to allow tiles to be swapped with other tiles
+    const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id });
+
+    // Combine refs
+    const setNodeRef = (node: HTMLElement | null) => {
+        setDraggableRef(node);
+        setDroppableRef(node);
     };
 
-    // Inject DnD props into children (individual tiles)
-    // This assumes the child component accepts these props
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        // Significant dimming of source tile to emphasize the overlay
+        opacity: isDragging ? 0.2 : 1,
+        zIndex: isDragging ? 10 : 0,
+    };
+
     const childrenWithProps = React.Children.map(children, child => {
         if (React.isValidElement(child)) {
             return React.cloneElement(child as React.ReactElement<any>, {
@@ -73,7 +77,11 @@ export const SortableTile: React.FC<SortableTileProps> = ({
         <div
             ref={setNodeRef}
             style={style}
-            className={cn(getSizeClass(size), "relative")}
+            className={cn(
+                getSizeClass(size),
+                "relative transition-all duration-200",
+                isOver && !isDragging && "scale-[1.02] z-10 ring-4 ring-blue-500/30 ring-offset-2 rounded-2xl"
+            )}
             {...attributes}
         >
             {childrenWithProps}

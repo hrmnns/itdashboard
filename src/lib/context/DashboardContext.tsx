@@ -14,19 +14,36 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Tile customization
+    const GRID_SIZE = 60;
+    const initialOrder = Array.from({ length: GRID_SIZE }, (_, i) => `slot-${i}`);
+    TILES.forEach((tile, i) => {
+        if (i < GRID_SIZE) initialOrder[i] = tile.id;
+    });
+
+    // Merge existing tiles into the slots at initialization
     const [visibleTileIds, setVisibleTileIds] = useLocalStorage<string[]>('visibleTileIds', TILES.map(t => t.id));
-    const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', TILES.map(t => t.id));
+    const [tileOrder, setTileOrder] = useLocalStorage<string[]>('tileOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
 
-    // Sync state if new tiles are added to the configuration
+    // Sync state if new tiles are added, but preserve slots
     React.useEffect(() => {
         const allTileIds = TILES.map(t => t.id);
-        const newTiles = allTileIds.filter(id => !tileOrder.includes(id));
+        const missingTiles = allTileIds.filter(id => !tileOrder.includes(id));
 
-        if (newTiles.length > 0) {
-            setTileOrder(prev => [...prev, ...newTiles]);
-            setVisibleTileIds(prev => [...new Set([...prev, ...newTiles])]);
+        if (missingTiles.length > 0) {
+            setTileOrder(prev => {
+                const next = [...prev];
+                let missingIdx = 0;
+                // Try to fill empty slots first
+                for (let i = 0; i < next.length && missingIdx < missingTiles.length; i++) {
+                    if (next[i].startsWith('slot-')) {
+                        next[i] = missingTiles[missingIdx++];
+                    }
+                }
+                // If no slots left, append
+                return [...next, ...missingTiles.slice(missingIdx)];
+            });
+            setVisibleTileIds(prev => [...new Set([...prev, ...missingTiles])]);
         }
     }, [tileOrder, setTileOrder, visibleTileIds, setVisibleTileIds]);
 

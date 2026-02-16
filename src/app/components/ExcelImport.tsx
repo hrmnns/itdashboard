@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx';
 import { Upload, Check, AlertCircle } from 'lucide-react';
 import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
-import validateInvoiceItems from '../../lib/validators/invoice-items-validator.js';
+// @ts-ignore - AJV generated validator
+import { validate as validateInvoiceItems } from '../../lib/validators/invoice-items-validator.js';
 import { ColumnMapper } from './ColumnMapper';
 import type { MappingConfig } from './ColumnMapper';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -312,7 +313,7 @@ export const ExcelImport: React.FC<ExcelImportProps> = ({ onImportComplete }) =>
             if (!isValid) {
                 setStatus('error');
                 setMessage('Validation failed for Invoice Items.');
-                setErrors(validateInvoiceItems.errors?.map(err =>
+                setErrors((validateInvoiceItems as any).errors?.map((err: any) =>
                     `${err.instancePath} ${err.message}${err.params ? ' (' + JSON.stringify(err.params) + ')' : ''}`
                 ) || []);
                 setIsImporting(false);
