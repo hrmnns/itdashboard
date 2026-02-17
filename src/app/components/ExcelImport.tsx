@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, Check, AlertCircle, PlusCircle, RotateCcw } from 'lucide-react';
-import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearDatabase, clearInvoiceData } from '../../lib/db';
+import { bulkInsertKPIs, bulkInsertEvents, bulkInsertInvoiceItems, clearInvoiceData } from '../../lib/db';
 import invoiceItemsSchema from '../../schemas/invoice-items-schema.json';
 // @ts-ignore - AJV generated validator
 import { validate as validateInvoiceItems } from '../../lib/validators/invoice-items-validator.js';

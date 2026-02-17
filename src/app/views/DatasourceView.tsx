@@ -194,6 +194,58 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                         </div>
                     </div>
                 </div>
+
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-rose-100 dark:border-rose-900/30 p-6 shadow-sm overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] dark:opacity-[0.05] pointer-events-none">
+                        <Database className="w-32 h-32 text-rose-600 rotate-12" />
+                    </div>
+
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Gefahrenbereich</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
+                        Hier können Sie gezielt Tabelleninhalte löschen. Diese Aktion kann nicht rückgängig gemacht werden.
+                    </p>
+
+                    <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
+                        <div className="flex-1 w-full">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
+                                Tabelle auswählen
+                            </label>
+                            <select
+                                id="table-to-clear"
+                                className="w-full h-11 px-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"
+                                defaultValue="invoice_items"
+                            >
+                                <option value="invoice_items">Rechnungen (invoice_items)</option>
+                                <option value="kpi_data">KPI Daten (kpi_data)</option>
+                                <option value="systems">Systeme (systems)</option>
+                                <option value="operations_events">Events (operations_events)</option>
+                                <option value="worklist">Arbeitsvorrat (worklist)</option>
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={async () => {
+                                const select = document.getElementById('table-to-clear') as HTMLSelectElement;
+                                const tableName = select.value;
+                                const tableLabel = select.options[select.selectedIndex].text.split(' (')[0];
+
+                                if (confirm(`Möchten Sie wirklich alle Einträge aus der Tabelle "${tableLabel}" löschen?`)) {
+                                    const { clearTable } = await import('../../lib/db');
+                                    await clearTable(tableName);
+                                    window.dispatchEvent(new Event('db-updated'));
+                                    window.dispatchEvent(new CustomEvent('db-changed', {
+                                        detail: { type: 'clear', target: tableName }
+                                    }));
+                                    onImportComplete();
+                                }
+                            }}
+                            className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-700 dark:bg-rose-900/10 dark:hover:bg-rose-600 dark:text-rose-400 text-sm font-black rounded-xl border border-rose-100 dark:border-rose-900/30 transition-all uppercase tracking-wider shadow-sm"
+                        >
+                            Tabelle leeren
+                            <Database className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <Modal

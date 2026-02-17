@@ -231,6 +231,17 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
+            case 'CLEAR_TABLE':
+                if (!db) await initDB();
+                const tableName = payload.tableName;
+                // Basic security: only Allow alphanumeric + underscores
+                if (!/^[a-z0-9_]+$/i.test(tableName)) {
+                    throw new Error(`Invalid table name: ${tableName}`);
+                }
+                db.exec(`DELETE FROM ${tableName};`);
+                result = true;
+                break;
+
             case 'LOAD_DEMO':
                 if (!db) await initDB();
                 await loadDemoData();
