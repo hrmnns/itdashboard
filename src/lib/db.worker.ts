@@ -50,6 +50,10 @@ async function initDB() {
             db.exec(schemaSql);
             db.exec(viewsSql);
 
+            // Cleanup obsolete tables
+            db.exec("DROP TABLE IF EXISTS kpi_data");
+            db.exec("DROP TABLE IF EXISTS operations_events");
+
             // Migration: Add is_favorite to systems if it doesn't exist
             try {
                 const columns: string[] = [];
@@ -205,13 +209,27 @@ async function handleMessage(e: MessageEvent) {
 
             case 'BULK_INSERT_INVOICE_ITEMS':
                 if (!db) await initDB();
-                insertInvoiceItems(payload);
+                try {
+                    db.exec('BEGIN TRANSACTION');
+                    insertInvoiceItems(payload);
+                    db.exec('COMMIT');
+                } catch (err) {
+                    db.exec('ROLLBACK');
+                    throw err;
+                }
                 result = true;
                 break;
 
             case 'BULK_INSERT_SYSTEMS':
                 if (!db) await initDB();
-                insertSystems(payload);
+                try {
+                    db.exec('BEGIN TRANSACTION');
+                    insertSystems(payload);
+                    db.exec('COMMIT');
+                } catch (err) {
+                    db.exec('ROLLBACK');
+                    throw err;
+                }
                 result = true;
                 break;
 
@@ -233,6 +251,8 @@ async function handleMessage(e: MessageEvent) {
             case 'CLEAR':
                 if (!db) await initDB();
                 db.exec('DELETE FROM invoice_items;');
+                db.exec('DELETE FROM systems;');
+                db.exec('DELETE FROM worklist;');
                 result = true;
                 break;
 
@@ -340,7 +360,6 @@ function insertInvoiceItems(data: any[]) {
     `;
     const stmt = db.prepare(sql);
     try {
-        db.exec('BEGIN TRANSACTION');
         for (const item of data) {
             stmt.bind([
                 item.FiscalYear, item.Period, item.PostingDate, item.VendorName, item.VendorId,
@@ -352,10 +371,6 @@ function insertInvoiceItems(data: any[]) {
             stmt.step();
             stmt.reset();
         }
-        db.exec('COMMIT');
-    } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
     } finally {
         stmt.finalize();
     }
@@ -364,16 +379,11 @@ function insertInvoiceItems(data: any[]) {
 function insertSystems(data: any[]) {
     const stmt = db.prepare('INSERT INTO systems (name, url, status, category, is_favorite, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
     try {
-        db.exec('BEGIN TRANSACTION');
         for (const item of data) {
             stmt.bind([item.name, item.url, item.status, item.category, item.is_favorite || 0, item.sort_order || 0]);
             stmt.step();
             stmt.reset();
         }
-        db.exec('COMMIT');
-    } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
     } finally {
         stmt.finalize();
     }

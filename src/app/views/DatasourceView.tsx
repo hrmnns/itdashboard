@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, Database, Upload, Download, Save } from 'lucide-react';
+import { Info, Database, Upload, Download, Save, Check } from 'lucide-react';
 import { ExcelImport } from '../components/ExcelImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
 import { Modal } from '../components/Modal';
@@ -20,6 +20,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
     const [target, setTarget] = React.useState<'invoice_items' | 'systems'>('invoice_items');
     const [isSchemaOpen, setIsSchemaOpen] = React.useState(false);
+    const [showSuccess, setShowSuccess] = React.useState(false);
 
     const { isBackupRecommended, changeCount, markBackupComplete } = useBackupStatus();
 
@@ -58,6 +59,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         await initDB();
                                         await initSchema();
                                         await loadDemoData();
+                                        setShowSuccess(true);
+                                        setTimeout(() => setShowSuccess(false), 3000);
                                         window.dispatchEvent(new Event('db-updated'));
                                         onImportComplete();
                                     } catch (e) {
@@ -144,6 +147,16 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
 
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Sicherung & Wiederherstellung</h3>
+
+                    {/* Success Feedback */}
+                    {showSuccess && (
+                        <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/30 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+                            <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                                Demodaten erfolgreich geladen!
+                            </span>
+                        </div>
+                    )}
 
                     {/* Backup Reminder Banner */}
                     {isBackupRecommended && (
@@ -260,6 +273,21 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                             className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-700 dark:bg-rose-900/10 dark:hover:bg-rose-600 dark:text-rose-400 text-sm font-black rounded-xl border border-rose-100 dark:border-rose-900/30 transition-all uppercase tracking-wider shadow-sm"
                         >
                             Tabelle leeren
+                            <Database className="w-4 h-4" />
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                if (confirm('Möchten Sie wirklich ALLE Daten aus ALLEN Tabellen löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')) {
+                                    const { clearDatabase } = await import('../../lib/db');
+                                    await clearDatabase();
+                                    window.dispatchEvent(new Event('db-updated'));
+                                    onImportComplete();
+                                }
+                            }}
+                            className="h-11 flex items-center justify-center gap-2 px-6 bg-rose-600 hover:bg-rose-700 text-white text-sm font-black rounded-xl transition-all uppercase tracking-wider shadow-md"
+                        >
+                            Daten löschen
                             <Database className="w-4 h-4" />
                         </button>
                     </div>
