@@ -204,8 +204,8 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
     return (
         <PageLayout
             header={{
-                title: referenceItem.Description || 'Datensatz',
-                subtitle: `${referenceItem.VendorName || referenceItem.VendorId || 'Globaler Lieferant'}`,
+                title: `Beleg ${referenceItem.DocumentId} · Pos #${referenceItem.LineId}`,
+                subtitle: referenceItem.Description || 'Keine Beschreibung verfügbar',
                 onBack,
                 actions: (
                     <div className="flex items-center gap-2">

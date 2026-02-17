@@ -9,13 +9,11 @@ export const AnomalyDetailPage: React.FC = () => {
     if (!period || !anomalyId) return null;
 
     return (
-        <div className="animate-in slide-in-from-right-4 duration-500 h-full overflow-y-auto p-6 md:p-8">
-            <AnomalyDetailView
-                anomalyId={anomalyId}
-                period={period}
-                onBack={() => navigate('/anomalies')}
-                onOpenInvoice={() => navigate(`/costs/${period}/${anomalyId}`)}
-            />
-        </div>
+        <AnomalyDetailView
+            anomalyId={anomalyId}
+            period={period}
+            onBack={() => navigate('/anomalies')}
+            onOpenInvoice={() => navigate(`/costs/${period}/${anomalyId}`)}
+        />
     );
 };
