@@ -60,6 +60,9 @@ export const SortableComponent: React.FC<SortableComponentProps> = ({
 
     const childrenWithProps = React.Children.map(children, child => {
         if (React.isValidElement(child)) {
+            // Only inject props into custom components, not plain DOM elements like 'div'
+            if (typeof child.type === 'string') return child;
+
             return React.cloneElement(child as React.ReactElement<any>, {
                 onRemove: onRemove ? () => onRemove(id) : undefined,
                 dragHandleProps: listeners,

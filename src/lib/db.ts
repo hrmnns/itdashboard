@@ -155,6 +155,11 @@ export async function loadDemoData() {
     return send('LOAD_DEMO');
 }
 
+export async function exportDemoData(): Promise<any> {
+    await initDB();
+    return send('EXPORT_DEMO_DATA');
+}
+
 export async function initSchema() {
     await initDB();
     return send('INIT_SCHEMA');

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, Database, Upload } from 'lucide-react';
+import { Info, Database, Upload, Download, Save } from 'lucide-react';
 import { ExcelImport } from '../components/ExcelImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
 import { Modal } from '../components/Modal';
@@ -50,24 +50,44 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                 Neu im Dashboard? Lade Beispieldaten, um Kacheln, Diagramme und Datenbankfunktionen sofort zu erkunden.
                             </p>
                         </div>
-                        <button
-                            onClick={async () => {
-                                try {
-                                    const { loadDemoData, initSchema, initDB } = await import('../../lib/db');
-                                    await initDB();
-                                    await initSchema();
-                                    await loadDemoData();
-                                    window.dispatchEvent(new Event('db-updated'));
-                                    onImportComplete();
-                                } catch (e) {
-                                    console.error(e);
-                                    alert('Fehler beim Laden der Daten');
-                                }
-                            }}
-                            className="flex-shrink-0 h-10 flex items-center justify-center gap-2 px-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all shadow-sm"
-                        >
-                            Demo laden
-                        </button>
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const { loadDemoData, initSchema, initDB } = await import('../../lib/db');
+                                        await initDB();
+                                        await initSchema();
+                                        await loadDemoData();
+                                        window.dispatchEvent(new Event('db-updated'));
+                                        onImportComplete();
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert('Fehler beim Laden der Daten');
+                                    }
+                                }}
+                                className="flex-shrink-0 h-10 flex items-center justify-center gap-2 px-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all shadow-sm whitespace-nowrap"
+                            >
+                                <Download className="w-4 h-4" />
+                                Demo laden
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    const { exportDemoData } = await import('../../lib/db');
+                                    const data = await exportDemoData();
+                                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = 'demo-small.json';
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                }}
+                                className="flex-shrink-0 h-10 flex items-center justify-center gap-2 px-5 bg-white hover:bg-slate-50 text-blue-600 border border-blue-200 text-sm font-semibold rounded-lg transition-all shadow-sm whitespace-nowrap"
+                            >
+                                <Save className="w-4 h-4" />
+                                Demodaten exportieren (JSON)
+                            </button>
+                        </div>
                     </div>
                 </div>
 
