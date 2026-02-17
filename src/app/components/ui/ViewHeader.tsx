@@ -16,7 +16,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({ title, subtitle, onBack,
                 {onBack && (
                     <button
                         onClick={onBack}
-                        className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all border border-slate-200 dark:border-slate-700 shadow-sm group"
+                        className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all border border-slate-300 dark:border-slate-700 shadow-sm group"
                         title="Go Back"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform text-slate-600 dark:text-slate-400" />

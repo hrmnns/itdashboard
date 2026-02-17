@@ -58,11 +58,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return (
         <aside className={`
-            fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transform transition-all duration-300 ease-in-out
+            fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 transform transition-all duration-300 ease-in-out
             ${isCollapsed ? 'md:w-20' : 'md:w-64'}
             ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
         `}>
-            <div className={`p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between ${isCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
+            <div className={`p-6 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between ${isCollapsed ? 'md:p-4 md:justify-center' : ''}`}>
                 <div className="flex items-center gap-2.5 overflow-hidden">
                     <div className="flex-shrink-0 p-1.5 bg-blue-600 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none">
                         <ShieldCheck className="w-5 h-5 text-white" />
@@ -81,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* PC Collapse Toggle */}
                 <button
                     onClick={onToggleCollapse}
-                    className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full items-center justify-center shadow-md hover:text-blue-600 transition-colors z-50"
+                    className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-full items-center justify-center shadow-md hover:text-blue-600 transition-colors z-50"
                 >
                     {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     ))}
                 </nav>
 
-                <div className={`p-4 border-t border-slate-200 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2' : ''}`}>
+                <div className={`p-4 border-t border-slate-300 dark:border-slate-700 transition-all space-y-4 ${isCollapsed ? 'md:p-2' : ''}`}>
 
                     {/* Privacy Toggle */}
                     <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-2`}>

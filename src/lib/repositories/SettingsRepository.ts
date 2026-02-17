@@ -1,4 +1,4 @@
-import { runQuery } from '../db';
+import { runQuery, notifyDbChange } from '../db';
 
 
 export const SettingsRepository = {
@@ -9,5 +9,6 @@ export const SettingsRepository = {
 
     async set(key: string, value: string): Promise<void> {
         await runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
+        notifyDbChange();
     }
 };

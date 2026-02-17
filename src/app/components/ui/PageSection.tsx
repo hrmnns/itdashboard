@@ -24,12 +24,12 @@ export const PageSection: React.FC<PageSectionProps> = ({
     return (
         <section
             className={cn(
-                'bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden',
+                'bg-white dark:bg-slate-800 rounded-2xl border border-slate-300 dark:border-slate-700 shadow-sm overflow-hidden',
                 className
             )}
         >
             {title && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700/50">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">{title}</h3>
                     {actions && <div className="flex items-center gap-2">{actions}</div>}
                 </div>

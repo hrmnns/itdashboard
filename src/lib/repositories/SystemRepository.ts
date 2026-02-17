@@ -1,4 +1,4 @@
-import { runQuery } from '../db';
+import { runQuery, notifyDbChange } from '../db';
 import type { SystemRecord, TableColumn } from '../../types';
 
 export const SystemRepository = {
@@ -20,6 +20,7 @@ export const SystemRepository = {
             `INSERT INTO systems (name, url, category, sort_order, is_favorite, status) VALUES (?, ?, ?, ?, ?, 'unknown')`,
             [system.name, system.url, system.category, nextSort, 0]
         );
+        notifyDbChange();
     },
 
     async update(id: number, system: Partial<SystemRecord>): Promise<void> {
@@ -36,10 +37,12 @@ export const SystemRepository = {
 
         params.push(id);
         await runQuery(`UPDATE systems SET ${updates.join(', ')} WHERE id = ?`, params);
+        notifyDbChange();
     },
 
     async delete(id: number): Promise<void> {
         await runQuery('DELETE FROM systems WHERE id = ?', [id]);
+        notifyDbChange();
     },
 
     async getFavorites(limit: number = 4): Promise<SystemRecord[]> {

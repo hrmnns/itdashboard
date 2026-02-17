@@ -13,6 +13,9 @@ interface DashboardContextType {
     setSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
     isPrivacyMode: boolean;
     setPrivacyMode: (enabled: boolean | ((prev: boolean) => boolean)) => void;
+    changeCount: number;
+    lastBackup: string | null;
+    markBackupComplete: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -30,6 +33,32 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [componentOrder, setComponentOrder] = useLocalStorage<string[]>('componentOrder', initialOrder);
     const [isSidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('isSidebarCollapsed', false);
     const [isPrivacyMode, setPrivacyMode] = useLocalStorage<boolean>('isPrivacyMode', false);
+
+    // Backup State
+    const [lastBackup, setLastBackup] = useLocalStorage<string | null>('itdashboard_last_backup', null);
+    const [changeCount, setChangeCount] = useLocalStorage<number>('itdashboard_changes_since_backup', 0);
+
+    const markBackupComplete = React.useCallback(() => {
+        setLastBackup(new Date().toISOString());
+        setChangeCount(0);
+    }, [setLastBackup, setChangeCount]);
+
+    React.useEffect(() => {
+        const handleDbChange = (e: any) => {
+            const detail = e.detail || {};
+            if (detail.type === 'restore') {
+                setChangeCount(0);
+                setLastBackup(new Date().toISOString());
+            } else if (detail.type === 'clear') {
+                setChangeCount((prev: number) => prev + 1);
+            } else {
+                setChangeCount((prev: number) => prev + (detail.count || 1));
+            }
+        };
+
+        window.addEventListener('db-changed', handleDbChange);
+        return () => window.removeEventListener('db-changed', handleDbChange);
+    }, [setChangeCount, setLastBackup]);
 
     // Sync state if new components are added, but preserve slots
     React.useEffect(() => {
@@ -70,7 +99,10 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             isSidebarCollapsed,
             setSidebarCollapsed,
             isPrivacyMode,
-            setPrivacyMode
+            setPrivacyMode,
+            changeCount,
+            lastBackup,
+            markBackupComplete
         }}>
             {children}
         </DashboardContext.Provider>

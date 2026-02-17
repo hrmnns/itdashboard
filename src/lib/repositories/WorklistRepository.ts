@@ -1,4 +1,4 @@
-import { runQuery } from '../db';
+import { runQuery, notifyDbChange, toggleWorklist } from '../db';
 import type { WorklistEntry, WorklistStatus } from '../../types';
 
 export const WorklistRepository = {
@@ -18,22 +18,7 @@ export const WorklistRepository = {
      * Toggles an item in the worklist (Add if not exists, remove if exists)
      */
     async toggle(sourceTable: string, sourceId: number, label?: string, context?: string): Promise<void> {
-        const existing = await runQuery(
-            'SELECT id FROM worklist WHERE source_table = ? AND source_id = ?',
-            [sourceTable, sourceId]
-        );
-
-        if (existing.length > 0) {
-            await runQuery(
-                'DELETE FROM worklist WHERE source_table = ? AND source_id = ?',
-                [sourceTable, sourceId]
-            );
-        } else {
-            await runQuery(
-                'INSERT INTO worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
-                [sourceTable, sourceId, label, context]
-            );
-        }
+        await toggleWorklist(sourceTable, sourceId, label, context);
     },
 
     async isInWorklist(sourceTable: string, sourceId: number): Promise<boolean> {
@@ -49,6 +34,7 @@ export const WorklistRepository = {
             'UPDATE worklist SET status = ? WHERE source_table = ? AND source_id = ?',
             [status, sourceTable, sourceId]
         );
+        notifyDbChange();
     },
 
     async getStatusCounts(): Promise<Record<WorklistStatus, number>> {

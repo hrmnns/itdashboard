@@ -101,6 +101,15 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
     });
 }
 
+/**
+ * Centrally notifies the system about database changes (used for backup status)
+ */
+export function notifyDbChange(count: number = 1, type: string = 'insert') {
+    window.dispatchEvent(new CustomEvent('db-changed', {
+        detail: { type, count }
+    }));
+}
+
 export function initDB() {
     return send<boolean>('INIT').then(() => { });
 }
@@ -177,17 +186,20 @@ export async function toggleWorklist(sourceTable: string, sourceId: number, labe
         [sourceTable, sourceId]
     );
 
+    let result;
     if (existing.length > 0) {
-        return runQuery(
+        result = await runQuery(
             'DELETE FROM worklist WHERE source_table = ? AND source_id = ?',
             [sourceTable, sourceId]
         );
     } else {
-        return runQuery(
+        result = await runQuery(
             'INSERT INTO worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
             [sourceTable, sourceId, label, context]
         );
     }
+    notifyDbChange();
+    return result;
 }
 
 export async function isInWorklist(sourceTable: string, sourceId: number): Promise<boolean> {

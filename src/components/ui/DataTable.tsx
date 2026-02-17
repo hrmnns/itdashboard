@@ -129,11 +129,11 @@ export function DataTable<T>({
     );
 
     return (
-        <div className="flex flex-col flex-1 overflow-hidden h-full relative border rounded-lg border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col flex-1 overflow-hidden h-full relative border rounded-lg border-slate-300 dark:border-slate-700">
             {/* Header Table (Static Vertical, Scrolls Horizontal) */}
             <div
                 ref={headerRef}
-                className="overflow-hidden flex-none bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700"
+                className="overflow-hidden flex-none bg-slate-50 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700"
             >
                 <table className="w-full text-sm text-left table-fixed">
                     {renderColGroup()}
@@ -191,7 +191,7 @@ export function DataTable<T>({
                                                     onChange={(e) => handleFilterChange(key as string, e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     placeholder={`Filter ${col.header}...`}
-                                                    className="w-full px-2 py-1 text-[10px] font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-300"
+                                                    className="w-full px-2 py-1 text-[10px] font-normal border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-300"
                                                 />
                                                 {filters[key as string] && (
                                                     <button
@@ -222,7 +222,7 @@ export function DataTable<T>({
             >
                 <table className="w-full text-sm text-left table-fixed">
                     {renderColGroup()}
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                         {filteredData.map((item, rowIndex) => (
                             <tr
                                 key={rowIndex}

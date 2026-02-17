@@ -35,15 +35,23 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const activeTable = tableName || 'invoice_items';
     const { mask } = usePseudonym();
 
+    const initializedRef = React.useRef(false);
+
     // Sync index when items change or modal opens
     useEffect(() => {
-        if (isOpen && items && items.length > 0) {
-            // Always sync provided index when modal opens or items/index change
+        if (!isOpen) {
+            initializedRef.current = false;
+            return;
+        }
+
+        if (isOpen && !initializedRef.current && items && items.length > 0) {
+            // Always sync provided index when modal opens
             const val = Math.max(0, initialIndex);
             setCurrentIndex(val);
             setReferenceIndex(val); // Auto-set initial item as reference logic
             setPreviousIndex(null);
             setHelpOpen(false);
+            initializedRef.current = true;
         }
     }, [isOpen, initialIndex, items]);
 
@@ -116,12 +124,12 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             >
                 <div className="space-y-6">
                     {/* Toolbar / Menu Bar */}
-                    <div className="-mx-6 -mt-6 mb-6 px-6 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div className="-mx-6 -mt-6 mb-6 px-6 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between">
                         <div className="flex items-center gap-1">
                             {schema && (
                                 <button
                                     onClick={() => setHelpOpen(true)}
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-500"
+                                    className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-500"
                                     title="Schema-Definition anzeigen"
                                 >
                                     <Info className="w-4 h-4" />
@@ -131,7 +139,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 onClick={handleToggleWorklist}
                                 className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isInWorklist
                                     ? 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
+                                    : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
                                     }`}
                                 title={isInWorklist ? "Vom Arbeitsvorrat entfernen" : "Zum Arbeitsvorrat hinzufügen"}
                             >
@@ -144,7 +152,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 onClick={handleToggleReference}
                                 className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 group relative ${isReferenceActive
                                     ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
+                                    : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
                                     }`}
                                 title={isCurrentReference ? "Referenz-Modus beenden" : "Als Referenz für Vergleich setzen"}
                             >
@@ -167,17 +175,17 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                             <button
                                 disabled={currentIndex === 0}
                                 onClick={() => handleNavigate(currentIndex - 1)}
-                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                             >
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
-                            <div className="text-[11px] font-black text-slate-700 dark:text-slate-200 min-w-[60px] text-center bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-800 shadow-sm">
+                            <div className="text-[11px] font-black text-slate-700 dark:text-slate-200 min-w-[60px] text-center bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
                                 {currentIndex + 1} / {items.length}
                             </div>
                             <button
                                 disabled={currentIndex === items.length - 1}
                                 onClick={() => handleNavigate(currentIndex + 1)}
-                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                             >
                                 <ChevronRight className="w-4 h-4" />
                             </button>
@@ -205,7 +213,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                 <div
                                     key={key}
                                     className={`
-                                        border-b border-slate-100 dark:border-slate-700 pb-2 transition-colors duration-500
+                                        border-b border-slate-200 dark:border-slate-700 pb-2 transition-colors duration-500
                                         ${isChanged ? 'bg-amber-50 dark:bg-amber-900/20 -mx-2 px-2 rounded-lg border-amber-200 dark:border-amber-800' : ''}
                                     `}
                                 >

@@ -86,13 +86,13 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
-            <header className="flex-shrink-0 px-6 md:px-8 py-4 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+            <header className="flex-shrink-0 px-6 md:px-8 py-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         {header.onBack && (
                             <button
                                 onClick={header.onBack}
-                                className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
+                                className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-all"
                                 title="Zurück"
                             >
                                 <ArrowLeft className="w-4 h-4" />
@@ -171,7 +171,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
 
             {/* ── Footer ── */}
             {(footer || (breadcrumbs && breadcrumbs.length > 0)) && (
-                <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center justify-between gap-4">
                         <div className="text-xs text-slate-400 dark:text-slate-500">
                             {footer}

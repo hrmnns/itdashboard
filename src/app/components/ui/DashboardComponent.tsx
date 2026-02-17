@@ -57,7 +57,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
 
     return (
         <div className={cn(
-            "group relative flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/60 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden h-full",
+            "group relative flex flex-col bg-white dark:bg-slate-800 rounded-3xl border border-slate-300 dark:border-slate-700/50 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden h-full",
             onClick && "cursor-pointer active:scale-[0.98]",
             className
         )}>
@@ -69,7 +69,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
             )}
 
             {/* Header - Reduced padding (p-5 pb-4 -> pt-2.5 pb-2.5 px-5) */}
-            <div className="relative flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-100 dark:border-slate-800/50">
+            <div className="relative flex items-center justify-between pt-2.5 pb-2.5 px-5 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800/50">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className={cn("p-1.5 rounded-xl shrink-0 shadow-sm", colorStyles[iconColor])}>
                         <Icon className="w-4 h-4" />
@@ -118,7 +118,7 @@ export const DashboardComponent: React.FC<DashboardComponentProps> = ({
 
             {/* Footer Area (Optional or Automatic via targetView) */}
             {hasFooter && (
-                <div className="relative p-3 px-5 border-t border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between min-h-[40px]">
+                <div className="relative p-3 px-5 border-t border-slate-200 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between min-h-[40px]">
                     <div className="flex-1 min-w-0">{effectiveFooterLeft}</div>
                     <div className="shrink-0">{footerRight}</div>
                 </div>

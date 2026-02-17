@@ -28,7 +28,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
     const trendColor = trend === 'up' ? 'text-emerald-500' : trend === 'down' ? 'text-red-500' : 'text-slate-400';
 
     return (
-        <div className={`bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group flex flex-col justify-between ${className}`}>
+        <div className={`bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-300 dark:border-slate-700 shadow-sm relative overflow-hidden group flex flex-col justify-between ${className}`}>
 
             {/* Header: Label & Icon */}
             <div className="flex items-center justify-between mb-2 z-10 relative">
