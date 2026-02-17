@@ -52,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }));
 
     const staticBottomItems: NavItem[] = [
+        { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: 'Data Management' },
         { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: 'Settings' },
     ];
 
