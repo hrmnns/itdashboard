@@ -291,9 +291,9 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
 
                 {/* Right Side: Properties Grid */}
                 <div className="space-y-6">
-                    <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-                        <h3 className="text-xs font-black uppercase tracking-widest text-blue-400 mb-6 flex items-center gap-2">
+                    <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/50 dark:bg-blue-600/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                        <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-6 flex items-center gap-2">
                             <Info className="w-4 h-4" />
                             Technische Identität
                         </h3>
@@ -310,28 +310,28 @@ export const ItCostsItemHistoryView: React.FC<ItCostsItemHistoryViewProps> = ({ 
                                 { label: 'Betrag / Währung', value: referenceItem?.Amount !== undefined && referenceItem?.Amount !== null ? `${referenceItem.Amount.toLocaleString('de-DE')} ${referenceItem.Currency || ''}` : null, icon: Receipt },
                             ].map((prop, i) => (
                                 <div key={i} className="group">
-                                    <div className="text-[9px] font-black uppercase text-slate-500 tracking-tighter mb-1">{prop.label}</div>
+                                    <div className="text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-tighter mb-1">{prop.label}</div>
                                     <div className="flex items-center gap-3">
-                                        <div className="p-1.5 bg-slate-800 rounded-lg text-slate-400 group-hover:text-blue-400 transition-colors">
+                                        <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
                                             <prop.icon className="w-3.5 h-3.5" />
                                         </div>
-                                        <span className={`text-sm font-mono break-all ${!prop.value ? 'text-slate-600 italic' : 'text-slate-200'}`}>
+                                        <span className={`text-sm font-mono break-all ${!prop.value ? 'text-slate-400 dark:text-slate-600 italic' : 'text-slate-900 dark:text-slate-200'}`}>
                                             {prop.value || '<Nicht angegeben>'}
                                         </span>
                                     </div>
                                 </div>
                             ))}
 
-                            <div className="pt-4 mt-4 border-t border-slate-800">
-                                <div className="text-[9px] font-black uppercase text-slate-500 tracking-tighter mb-2">Matching-Strategie</div>
-                                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                            <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
+                                <div className="text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-tighter mb-2">Matching-Strategie</div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700/50">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                                        <span className="text-xs font-bold text-emerald-400">
+                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                             {keyFields.join(' + ')}
                                         </span>
                                     </div>
-                                    <div className="text-[10px] text-slate-400 leading-relaxed font-mono">
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-mono">
                                         {keyFields.map(k => `${k}: ${referenceItem[k] ?? 'NULL'}`).join(', ')}
                                     </div>
                                 </div>
