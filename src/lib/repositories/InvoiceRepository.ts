@@ -1,5 +1,6 @@
 import { runQuery } from '../db';
 import type { InvoiceItem, ItCostsTrend } from '../../types';
+import { isValidIdentifier } from '../utils';
 
 export const InvoiceRepository = {
     /**
@@ -34,6 +35,9 @@ export const InvoiceRepository = {
         const params: (string | number | null)[] = [];
 
         keyFields.forEach((field: string) => {
+            if (!isValidIdentifier(field)) {
+                throw new Error(`Invalid field name: ${field}`);
+            }
             const value = referenceItem[field];
             if (value !== undefined && value !== null) {
                 conditions.push(`${field} = ?`);

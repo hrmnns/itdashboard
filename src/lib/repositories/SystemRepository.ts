@@ -1,5 +1,6 @@
 import { runQuery, notifyDbChange } from '../db';
 import type { SystemRecord, TableColumn } from '../../types';
+import { isValidIdentifier } from '../utils';
 
 export const SystemRepository = {
     async getAll(): Promise<SystemRecord[]> {
@@ -79,6 +80,9 @@ export const SystemRepository = {
     },
 
     async inspectTable(tableName: string, limit: number, searchTerm?: string): Promise<any[]> {
+        if (!isValidIdentifier(tableName)) {
+            throw new Error(`Invalid table name: ${tableName}`);
+        }
         let sql = `SELECT * FROM ${tableName}`;
         const params: any[] = [];
 

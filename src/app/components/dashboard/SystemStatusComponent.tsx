@@ -77,7 +77,7 @@ export const SystemStatusComponent: React.FC<{ onRemove?: () => void; dragHandle
                     </div>
 
                     {/* Secondary Metric: Load Time */}
-                    <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/50 text-center">
+                    <div className="w-full pt-4 border-t border-slate-200 dark:border-slate-800/50 text-center">
                         <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mb-1">
                             <Zap className="w-3 h-3" />
                             <span>Load Time</span>
