@@ -10,47 +10,17 @@ export interface ComponentConfig {
     defaultSize: ComponentSize;
 }
 
-// ─── Invoice Items ────────────────────────────────────────────
+// ─── Data Record (Generalized) ───────────────────────────────────
 
-export interface InvoiceItem {
+export interface DataRecord {
     id: number;
-    FiscalYear: number;
-    Period: string;
-    PostingDate: string;
-    VendorName: string | null;
-    VendorId: string | null;
-    DocumentId: string;
-    LineId: number;
-    CostCenter: string | null;
-    GLAccount: string | null;
-    Category: string | null;
-    SubCategory: string | null;
-    Service: string | null;
-    System: string | null;
-    RunChangeInnovation: string | null;
-    Amount: number;
-    Currency: string;
-    Quantity: number | null;
-    Unit: string | null;
-    UnitPrice: number | null;
-    ContractId: string | null;
-    POId: string | null;
-    IsRecurring: string | null;
-    Description: string | null;
-    SourceTag: string | null;
     /** Index signature for dynamic key field access */
     [key: string]: string | number | boolean | null | undefined;
 }
 
-// ─── Anomaly (extends InvoiceItem with scoring) ───────────────
+// ─── Anomaly (extends DataRecord with scoring) ───────────────
 
-export interface Anomaly extends InvoiceItem {
-    PrevAmount: number | null;
-    PrevPeriod: string | null;
-    ScoreDrift: number;
-    ScoreNew: number;
-    ScoreQuality: number;
-    ScoreValue: number;
+export interface Anomaly extends DataRecord {
     RiskScore: number;
     AnomalyType: 'Cost Drift' | 'New Item' | 'Data Quality' | 'Review';
 }
@@ -94,33 +64,10 @@ export interface KpiRecord {
     period: string;
 }
 
-export interface ItCostsTrend {
-    Period: string;
-    total: number;
-    year: number;
-    date: string;
-    invoice_count: number;
-    item_count: number;
-    synthetic_invoices: number;
-}
-export interface ItCostsSummary {
-    total_amount: number;
-    active_vendors: number;
+export interface DataSummary {
+    total_count: number;
     latest_date: string;
-    latest_year: number;
     unit?: string;
-}
-export interface InvoiceItemHistory {
-    Period: string;
-    Amount: number;
-    RecordCount: number;
-    id: number;
-    DocumentId: string;
-    LineId: number;
-    VendorName: string | null;
-    Description: string | null;
-    CostCenter: string | null;
-    GLAccount: string | null;
 }
 
 // ─── Settings ─────────────────────────────────────────────────
@@ -140,6 +87,53 @@ export interface TableColumn {
     notnull: number;
     dflt_value: any;
     pk: number;
+}
+
+// ─── Reporting & Dashboards ──────────────────────────────────────
+
+export interface AlertRule {
+    operator: '>' | '<' | '>=' | '<=' | '==';
+    value: number;
+    color: string;
+}
+
+export interface WidgetConfig {
+    type: 'table' | 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'composed' | 'radar' | 'scatter' | 'pivot';
+    xAxis?: string;
+    yAxes?: string[];
+    yAxis?: string;
+    color?: string;
+    showLabels?: boolean;
+    barSeries?: string[];
+    lineSeries?: string[];
+    rules?: AlertRule[];
+    pivotRows?: string[];
+    pivotCols?: string[];
+    pivotMeasures?: { field: string, agg: 'sum' | 'count' | 'avg' | 'min' | 'max' }[];
+}
+
+// ─── Report Packages ────────────────────────────────────────────────
+
+export interface ReportPackItem {
+    type: 'dashboard' | 'widget';
+    id: string;
+}
+
+export interface ReportPackConfig {
+    coverTitle: string;
+    coverSubtitle?: string;
+    author?: string;
+    showTOC: boolean;
+    items: ReportPackItem[];
+}
+
+export interface ReportPack {
+    id: string;
+    name: string;
+    description: string;
+    config: ReportPackConfig;
+    created_at?: string;
+    updated_at?: string;
 }
 
 /** Generic database row — use sparingly, prefer specific types */

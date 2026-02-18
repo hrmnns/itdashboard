@@ -126,10 +126,29 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const currentItem = items[currentIndex];
         if (!currentItem?.id) return;
 
-        // Label: Use Description or fallback to ID
-        const label = currentItem.Description || currentItem.VendorName || t('worklist.entry_id', { id: currentItem.id });
-        // Context: Use Period or Table
-        const context = currentItem.Period || activeTable;
+        // Label: Use generic label detection or fallback to ID
+        const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
+        let label = '';
+        for (const candidate of labelCandidates) {
+            // Find key case-insensitive
+            const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+            if (actualKey && currentItem[actualKey]) {
+                label = String(currentItem[actualKey]);
+                break;
+            }
+        }
+        if (!label) label = t('worklist.entry_id', { id: currentItem.id });
+
+        // Context: Use generic period/category or Table
+        const contextCandidates = ['period', 'fiscalyear', 'category', 'type', 'group', 'Period'];
+        let context = activeTable;
+        for (const candidate of contextCandidates) {
+            const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+            if (actualKey && currentItem[actualKey]) {
+                context = String(currentItem[actualKey]);
+                break;
+            }
+        }
 
         const existing = await SystemRepository.executeRaw(
             'SELECT id FROM sys_worklist WHERE source_table = ? AND source_id = ?',

@@ -87,6 +87,22 @@ async function initDB() {
                 error('Migration failed for sys_worklist', e);
             }
 
+            // Migration: sys_report_packs
+            try {
+                db.exec(`
+                    CREATE TABLE IF NOT EXISTS sys_report_packs (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        config TEXT, -- JSON string of ReportPackConfig
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                `);
+            } catch (e) {
+                error('Migration failed for sys_report_packs', e);
+            }
+
             // Views might depend on tables that don't exist yet, we should probably wrap this or make it on-demand
             try {
                 db.exec(viewsSql);

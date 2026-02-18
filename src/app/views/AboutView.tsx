@@ -156,7 +156,7 @@ export const AboutView: React.FC = () => {
 
                         <div className="px-2">
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold">
-                                © {new Date().getFullYear()} LiteBI Studio Projekt. Released under <a href="https://github.com/hrmnns/litebistudio/blob/10fc4285547ea09590f46b05a114883a9ba237c8/LICENSE">MIT License</a>.
+                                © {new Date().getFullYear()} LiteBI Studio Projekt. Released under <a href="LICENSE" target="_blank">MIT License</a>.
                             </p>
                         </div>
                     </div>

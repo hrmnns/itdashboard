@@ -3,13 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/ui/PageLayout';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 import { useAsync } from '../../hooks/useAsync';
-import { Plus, Layout, Trash2, Database, Star, Settings, Check, X, Edit2, Download, Maximize2 } from 'lucide-react';
+import { Plus, Layout, Trash2, Database, Star, Settings, Check, X, Edit2, Download, Maximize2, Filter } from 'lucide-react';
 import { useReportExport } from '../../hooks/useReportExport';
 import { WidgetRenderer } from '../components/WidgetRenderer';
 import { Modal } from '../components/Modal';
 import { getComponent, SYSTEM_WIDGETS } from '../registry';
 import { COMPONENTS } from '../../config/components';
 import { useDashboard } from '../../lib/context/DashboardContext';
+
+interface FilterDef {
+    column: string;
+    operator: string;
+    value: string;
+}
 
 interface SavedWidget {
     id: string; // Either UUID for custom or 'sys_...' for system
@@ -22,6 +28,7 @@ interface DashboardDef {
     name: string;
     layout: SavedWidget[];
     is_default: boolean;
+    filters?: FilterDef[];
 }
 
 export const CustomDashboardView: React.FC = () => {
@@ -40,10 +47,12 @@ export const CustomDashboardView: React.FC = () => {
     const [editName, setEditName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
+    const [showFilters, setShowFilters] = useState(false);
+    const [suggestedColumns, setSuggestedColumns] = useState<string[]>([]);
     const { visibleSidebarComponentIds, setVisibleSidebarComponentIds, togglePresentationMode } = useDashboard();
     const { isExporting, exportToPdf } = useReportExport();
 
-    // Fetch custom widgets (for the "Add Widget" modal)
+    // Fetch custom widgets
     const { data: customWidgets, refresh: refreshCustomWidgets } = useAsync<any[]>(
         async () => {
             return await SystemRepository.executeRaw('SELECT * FROM sys_user_widgets ORDER BY created_at DESC');
@@ -84,6 +93,37 @@ export const CustomDashboardView: React.FC = () => {
     }, []);
 
     const activeDashboard = dashboards.find(d => d.id === activeDashboardId);
+
+    // Dynamic Column Scanner for Global Filters
+    useEffect(() => {
+        if (!activeDashboard || !customWidgets) return;
+
+        const scanColumns = async () => {
+            const dashboardWidgetIds = activeDashboard.layout.map(w => w.id);
+            const activeWidgets = customWidgets.filter(w => dashboardWidgetIds.includes(w.id));
+
+            const tables = new Set<string>();
+            activeWidgets.forEach(w => {
+                const match = w.sql_query.match(/FROM\s+([a-zA-Z0-9_]+)/i);
+                if (match) tables.add(match[1]);
+            });
+
+            const allCols = new Set<string>();
+            for (const table of Array.from(tables)) {
+                try {
+                    const cols = await SystemRepository.getTableSchema(table);
+                    if (cols && Array.isArray(cols)) {
+                        cols.forEach(c => allCols.add(c.name));
+                    }
+                } catch (e) {
+                    console.error('Error fetching schema for table', table, e);
+                }
+            }
+            setSuggestedColumns(Array.from(allCols).sort());
+        };
+
+        scanColumns();
+    }, [activeDashboardId, customWidgets, activeDashboard?.layout]);
 
     // Sync active dashboard to DB
     const syncDashboard = async (updatedDash: DashboardDef) => {
@@ -172,6 +212,13 @@ export const CustomDashboardView: React.FC = () => {
                             {isExporting ? t('common.exporting') : t('common.export_pdf')}
                         </button>
                         <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`p-2 rounded-lg transition-colors border ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-100'}`}
+                            title={t('querybuilder.filter')}
+                        >
+                            <Filter className="w-5 h-5" />
+                        </button>
+                        <button
                             onClick={() => setIsAddModalOpen(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
                         >
@@ -182,6 +229,99 @@ export const CustomDashboardView: React.FC = () => {
                 )
             }}
         >
+            {/* Global Filter Bar */}
+            {showFilters && activeDashboard && (
+                <div className="mb-6 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm animate-in slide-in-from-top-2 duration-300">
+                    <datalist id="suggested-columns">
+                        {suggestedColumns.map(col => <option key={col} value={col} />)}
+                    </datalist>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col gap-1">
+                            <h4 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2">
+                                <Filter className="w-3.5 h-3.5 text-blue-500" /> {t('dashboard.filters_title')}
+                            </h4>
+                            <p className="text-[10px] text-slate-400">{t('dashboard.filters_subtitle', 'Slicers that affect all dashboard charts simultaneously.')}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {/* Smart Filter Buttons based on detected columns */}
+                            {suggestedColumns.filter(c =>
+                                ['Year', 'FiscalYear', 'Date', 'Month', 'Category', 'Group', 'Type', 'Status'].some(key => c.toLowerCase().includes(key.toLowerCase()))
+                            ).slice(0, 3).map(col => (
+                                <button
+                                    key={col}
+                                    onClick={() => syncDashboard({ ...activeDashboard, filters: [...(activeDashboard.filters || []), { column: col, operator: '=', value: '' }] })}
+                                    className="px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-slate-500 hover:text-blue-600 transition-colors"
+                                >
+                                    + {col}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => syncDashboard({ ...activeDashboard, filters: [...(activeDashboard.filters || []), { column: '', operator: '=', value: '' }] })}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-[10px] font-bold shadow-sm shadow-blue-100 hover:bg-blue-700 transition-colors"
+                            >
+                                {t('dashboard.add_filter')}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        {(activeDashboard.filters || []).map((f, i) => (
+                            <div key={i} className="flex items-center gap-2 group animate-in slide-in-from-left-2 duration-200" style={{ animationDelay: `${i * 50}ms` }}>
+                                <div className="flex-1 grid grid-cols-12 gap-2 p-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg group-hover:border-slate-200 group-hover:bg-white dark:group-hover:bg-slate-800 transition-all">
+                                    <input
+                                        placeholder={t('dashboard.filter_column')}
+                                        list="suggested-columns"
+                                        className="col-span-4 p-1.5 text-[11px] bg-transparent outline-none font-bold text-slate-700 dark:text-slate-200"
+                                        value={f.column}
+                                        onChange={e => {
+                                            const next = [...(activeDashboard.filters || [])];
+                                            next[i].column = e.target.value;
+                                            syncDashboard({ ...activeDashboard, filters: next });
+                                        }}
+                                    />
+                                    <select
+                                        className="col-span-3 p-1.5 text-[11px] bg-transparent outline-none border-l border-slate-100 dark:border-slate-800 text-slate-500 font-medium cursor-pointer"
+                                        value={f.operator}
+                                        onChange={e => {
+                                            const next = [...(activeDashboard.filters || [])];
+                                            next[i].operator = e.target.value;
+                                            syncDashboard({ ...activeDashboard, filters: next });
+                                        }}
+                                    >
+                                        <option value="=">=</option>
+                                        <option value="!=">!=</option>
+                                        <option value=">">&gt;</option>
+                                        <option value="<">&lt;</option>
+                                        <option value="contains">{t('dashboard.op_contains')}</option>
+                                        <option value="is null">{t('dashboard.op_is_null')}</option>
+                                    </select>
+                                    <input
+                                        placeholder={t('dashboard.filter_value')}
+                                        className="col-span-5 p-1.5 text-[11px] bg-transparent outline-none border-l border-slate-100 dark:border-slate-800 font-bold text-blue-600 dark:text-blue-400 placeholder:text-blue-200"
+                                        value={f.value}
+                                        onChange={e => {
+                                            const next = [...(activeDashboard.filters || [])];
+                                            next[i].value = e.target.value;
+                                            syncDashboard({ ...activeDashboard, filters: next });
+                                        }}
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => syncDashboard({ ...activeDashboard, filters: (activeDashboard.filters || []).filter((_, idx) => idx !== i) })}
+                                    className="p-1.5 text-slate-300 hover:text-red-500 transition-colors bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ))}
+                        {(activeDashboard.filters || []).length === 0 && (
+                            <div className="py-8 text-center border-2 border-dashed border-slate-50 dark:border-slate-800 rounded-xl">
+                                <Filter className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">{t('dashboard.no_filters')}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
             {/* Dashboard Tabs */}
             <div className="mb-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
@@ -307,6 +447,7 @@ export const CustomDashboardView: React.FC = () => {
                                         title={dbWidget.name}
                                         sql={dbWidget.sql_query}
                                         config={config}
+                                        globalFilters={activeDashboard.filters}
                                     />
                                 </div>
                             );

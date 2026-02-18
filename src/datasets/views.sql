@@ -1,7 +1,7 @@
 DROP VIEW IF EXISTS kpi_history;
 CREATE VIEW kpi_history AS
 SELECT 
-    'IT Costs' as metric, 
+    'Volume' as metric, 
     SUM(Amount) as value, 
     'EUR' as unit, 
     'Actuals' as category, 
@@ -10,7 +10,7 @@ SELECT
         ELSE MAX(PostingDate) 
     END as date,
     Period as period
-FROM invoice_items
+FROM records
 GROUP BY Period;
 
 DROP VIEW IF EXISTS latest_kpis;
@@ -19,16 +19,16 @@ SELECT * FROM kpi_history
 GROUP BY metric
 ORDER BY date DESC;
 
--- Detailed summary for the IT Costs tile
-DROP VIEW IF EXISTS it_costs_summary;
-CREATE VIEW it_costs_summary AS
+-- Detailed summary view
+DROP VIEW IF EXISTS data_summary_view;
+CREATE VIEW data_summary_view AS
 SELECT 
     SUM(Amount) as total_amount,
-    COUNT(DISTINCT COALESCE(NULLIF(VendorId, ''), VendorName)) as active_vendors,
+    COUNT(DISTINCT VendorName) as active_entities,
     MAX(PostingDate) as latest_date,
     MAX(FiscalYear) as latest_year,
     'EUR' as unit
-FROM invoice_items;
+FROM records;
 
 -- Anomaly Radar View
 DROP VIEW IF EXISTS view_anomalies;
@@ -37,24 +37,14 @@ WITH ItemHistory AS (
     SELECT 
         *,
         LAG(Amount) OVER (
-            PARTITION BY 
-                CASE 
-                    WHEN POId IS NOT NULL AND LineId IS NOT NULL THEN 'PO:' || POId || ':' || LineId
-                    WHEN ContractId IS NOT NULL AND LineId IS NOT NULL THEN 'CT:' || ContractId || ':' || LineId
-                    ELSE 'V:' || COALESCE(VendorName, '') || ':' || COALESCE(Description, '')
-                END 
+            PARTITION BY Category, SubCategory
             ORDER BY Period
         ) as PrevAmount,
         LAG(Period) OVER (
-            PARTITION BY 
-                CASE 
-                    WHEN POId IS NOT NULL AND LineId IS NOT NULL THEN 'PO:' || POId || ':' || LineId
-                    WHEN ContractId IS NOT NULL AND LineId IS NOT NULL THEN 'CT:' || ContractId || ':' || LineId
-                    ELSE 'V:' || COALESCE(VendorName, '') || ':' || COALESCE(Description, '')
-                END 
+            PARTITION BY Category, SubCategory
             ORDER BY Period
         ) as PrevPeriod
-    FROM invoice_items
+    FROM records
 ),
 ScoredItems AS (
     SELECT 
@@ -74,7 +64,7 @@ ScoredItems AS (
 
         -- 3. Quality Score: Synthetic IDs
         CASE 
-            WHEN DocumentId LIKE 'GEN-%' THEN 25 
+            WHEN id < 0 THEN 25 
             ELSE 0 
         END as ScoreQuality,
 
@@ -92,4 +82,4 @@ SELECT
         ELSE 'Review'
     END as AnomalyType
 FROM ScoredItems
-WHERE RiskScore > 40; -- Only significant anomalies
+WHERE RiskScore > 40;

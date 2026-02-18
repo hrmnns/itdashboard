@@ -109,7 +109,11 @@ export const SystemRepository = {
 
     // Dashboards (Multi-Dashboard Support)
     async getDashboards(): Promise<any[]> {
-        return await runQuery('SELECT * FROM sys_dashboards ORDER BY created_at ASC');
+        const result = await runQuery('SELECT * FROM sys_dashboards ORDER BY created_at ASC');
+        return result.map(r => ({
+            ...r,
+            layout: typeof r.layout === 'string' ? JSON.parse(r.layout) : r.layout
+        }));
     },
 
     async saveDashboard(dashboard: any): Promise<void> {
@@ -130,6 +134,36 @@ export const SystemRepository = {
 
     async deleteDashboard(id: string): Promise<void> {
         await runQuery('DELETE FROM sys_dashboards WHERE id = ?', [id]);
+        notifyDbChange();
+    },
+
+    // Report Packages
+    async getReportPacks(): Promise<any[]> {
+        const result = await runQuery('SELECT * FROM sys_report_packs ORDER BY created_at DESC');
+        return result.map(r => ({
+            ...r,
+            config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config
+        }));
+    },
+
+    async saveReportPack(pack: any): Promise<void> {
+        const existing = await runQuery('SELECT id FROM sys_report_packs WHERE id = ?', [pack.id]);
+        if (existing.length > 0) {
+            await runQuery(
+                'UPDATE sys_report_packs SET name = ?, description = ?, config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [pack.name, pack.description, JSON.stringify(pack.config), pack.id]
+            );
+        } else {
+            await runQuery(
+                'INSERT INTO sys_report_packs (id, name, description, config) VALUES (?, ?, ?, ?)',
+                [pack.id, pack.name, pack.description, JSON.stringify(pack.config)]
+            );
+        }
+        notifyDbChange();
+    },
+
+    async deleteReportPack(id: string): Promise<void> {
+        await runQuery('DELETE FROM sys_report_packs WHERE id = ?', [id]);
         notifyDbChange();
     },
 

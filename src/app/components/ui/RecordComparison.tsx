@@ -1,10 +1,10 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
-import type { InvoiceItem } from '../../../types';
+import type { DataRecord } from '../../../types';
 
 interface RecordComparisonProps {
-    leftItem: InvoiceItem;
-    rightItem: InvoiceItem;
+    leftItem: DataRecord;
+    rightItem: DataRecord;
     leftLabel?: string;
     rightLabel?: string;
     excludeKeys?: string[];

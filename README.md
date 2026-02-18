@@ -8,20 +8,21 @@ A high-performance, browser-based business intelligence platform with local SQLi
 - **Visual & SQL Query Builder**: 
   - **Visual Mode**: Drag-and-drop interface for table selection, filtering, and aggregation.
   - **SQL Mode**: Full SQL editor for advanced users with real-time preview and charting.
+  - **SQL Copilot**: Integrated snippet assistant and schema-aware templates for rapid query development.
+- **Advanced Visualization**: 
+  - **Charts**: Responsive Pie, Bar, Line, Area, Radar, and Scatter charts with multi-series support.
+  - **Pivot Tables**: Multi-dimensional matrix analysis with grouping (rows/cols) and 5+ aggregation types (Sum, Count, Avg, Min, Max).
+  - **KPI Alerts**: Traffic light indicator systems for single-value tiles based on customizable threshold rules.
+- **Reporting & Multi-Page Export**:
+  - **Report Packages**: Build complex management reports by combining multiple dashboards into one sequential document.
+  - **Advanced PDF Core**: Automated multi-page exports including Cover Pages, Tables of Contents (TOC), and consistent branding.
+  - **Single-Widget Export**: High-quality image and PDF export of individual results.
 - **Modular Data Import**: 
   - **Smart Import**: Automated schema generation from Excel files.
   - **Generic Import**: Direct mapping of Excel data to existing database structures with pre-import validation.
 - **Interactive Worklist**: 
-  - Centralized management of flagged records.
-  - Integrated status tracking and commenting.
-  - Automatic existence checks for source records.
-- **Advanced Visualization**: 
-  - Responsive charts (Pie, Bar, Line, Area) with multi-series support.
-  - Direct integration into dashboards as custom widgets.
-- **Reporting & Export**:
-  - High-quality PDF and Image export of dashboards and query results.
-  - **Presentation Mode** for clean, distractions-free screen sharing.
-- **Multi-Language Support**: Full internationalization support with instant switching between English and German.
+  - Centralized management of flagged records with status tracking and existence checks.
+- **Multi-Language Support**: Full internationalization (English & German) with instant UI switching.
 - **Security & Privacy**:
   - **App Lock**: Optional password protection for the entire interface.
   - **Encrypted Backups**: Password-protected database exports using AES encryption.

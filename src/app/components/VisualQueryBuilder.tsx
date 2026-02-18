@@ -30,7 +30,7 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
     const [tables, setTables] = useState<string[]>([]);
     const [columns, setColumns] = useState<{ name: string; type: string }[]>([]);
     const [config, setConfig] = useState<QueryConfig>(initialConfig || {
-        table: 'invoice_items',
+        table: '',
         columns: [],
         filters: [],
         aggregations: [],
@@ -54,7 +54,12 @@ export const VisualQueryBuilder: React.FC<VisualQueryBuilderProps> = ({ onChange
 
     // Load tables
     useEffect(() => {
-        SystemRepository.getTables().then(setTables);
+        SystemRepository.getTables().then(allTables => {
+            setTables(allTables);
+            if (!config.table && allTables.length > 0) {
+                setConfig(prev => ({ ...prev, table: allTables[0] }));
+            }
+        });
     }, []);
 
     // Load columns when table changes

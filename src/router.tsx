@@ -9,6 +9,7 @@ import { QueryBuilderView } from './app/views/QueryBuilderView';
 import { CustomDashboardView } from './app/views/CustomDashboardView';
 import { WorklistView } from './app/views/WorklistView';
 import { AboutView } from './app/views/AboutView';
+import { ReportPackView } from './app/views/ReportPackView';
 
 export const AppRouter: React.FC = () => (
     <HashRouter>
@@ -29,6 +30,7 @@ export const AppRouter: React.FC = () => (
                     <WorklistView />
                 } />
                 <Route path="about" element={<AboutView />} />
+                <Route path="reports" element={<ReportPackView />} />
             </Route>
         </Routes>
     </HashRouter>

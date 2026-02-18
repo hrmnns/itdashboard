@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info } from 'lucide-react';
+import { LayoutDashboard, Settings, Database, Menu, ChevronLeft, ChevronRight, ClipboardList, ShieldCheck, Wallet, Server, Radar, Search, Play, Globe, Info, FileText } from 'lucide-react';
 import { SystemStatus } from './SystemStatus';
 import { useDashboard } from '../../lib/context/DashboardContext';
 import { COMPONENTS } from '../../config/components';
@@ -60,8 +60,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const staticBottomItems: NavItem[] = [
         { to: '/datasource', icon: <Database className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.datasource') },
         { to: '/query', icon: <Play className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.query_builder') },
+        { to: '/reports', icon: <FileText className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.reports') },
         { to: '/settings', icon: <Settings className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.settings') },
-        { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about', 'Über') },
+        { to: '/about', icon: <Info className="w-5 h-5 flex-shrink-0" />, label: t('sidebar.about') },
     ];
 
     return (
