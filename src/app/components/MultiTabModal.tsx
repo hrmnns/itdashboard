@@ -32,7 +32,7 @@ export const MultiTabModal: React.FC<MultiTabModalProps> = () => {
 
                 <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-t border-slate-100 dark:border-slate-800 flex justify-center">
                     <a
-                        href="https://developer.mozilla.org/en-US/docs/Web/API/Origin_Private_File_System"
+                        href="https://github.com/hrmnns/litebistudio/blob/48f73003fb415174711f4e77baaf1433637d76ff/docs/Single-Instance-Policy.md"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
