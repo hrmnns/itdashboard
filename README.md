@@ -24,14 +24,14 @@ A high-performance, browser-based business intelligence platform with local SQLi
   - Centralized management of flagged records with status tracking and existence checks.
 - **Multi-Language Support**: Full internationalization (English & German) with instant UI switching.
 - **Security & Privacy**:
-  - **App Lock**: Optional password protection for the entire interface.
-  - **Encrypted Backups**: Password-protected database exports using AES encryption.
-- **Zero-Backend Architecture**: Runs entirely in the browser using SQLite WASM + OPFS for maximum performance and data sovereignty.
+  - **App Lock**: Salted PIN protection for the entire interface.
+  - **Encrypted Backups**: Password-protected database exports using AES-GCM encryption.
+- **Zero-Backend Architecture**: Runs entirely in the browser using SQLite WASM + OPFS for maximum performance, data sovereignty, and domain neutrality (works with any data structure).
 
 ## 🛠️ Tech Stack
 
-- **Framework**: React 18 + TypeScript (Vite)
-- **Styling**: Tailwind CSS (Modular Utility First)
+- **Framework**: React 19 + TypeScript (Vite)
+- **Styling**: Tailwind CSS (Utility First)
 - **Database**: SQLite WASM + OPFS (Persistent Browser Storage)
 - **Visualization**: Recharts & Lucide Icons
 - **Internationalization**: i18next & react-i18next
@@ -41,14 +41,14 @@ A high-performance, browser-based business intelligence platform with local SQLi
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16.x or later)
+- [Node.js](https://nodejs.org/) (v18.x or later)
 - [npm](https://www.npmjs.com/)
 
 ### Installation & Development
 
 1.  **Clone & Install**:
     ```bash
-    git clone https://github.com/litebistudio/litebistudio.git
+    git clone https://github.com/hrmnns/litebistudio.git
     cd litebistudio
     npm install
     ```
@@ -65,12 +65,13 @@ A high-performance, browser-based business intelligence platform with local SQLi
 
 ## 🏗️ Project Architecture
 
-- `src/app/`: Primary UI layer including views, components, and dashboard registry.
-- `src/hooks/`: Unified infrastructure hooks for data fetching, reporting, and state.
-- `src/lib/`: Core system logic (Database worker, Cryptography, Repositories).
-- `src/config/`: Component definitions and registry configurations.
-- `src/locales/`: Translation files (JSON) for all supported languages.
-- `src/datasets/`: Initial SQL schemas, views, and demo data structures.
+- `src/app/`: Primary UI layer including views (Dashboard, Query Builder, Report Packs).
+- `src/hooks/`: Unified infrastructure hooks (Database, Export, i18n).
+- `src/lib/`: Core system logic (DB Worker, Repositories, Cryptography utilities).
+- `src/config/`: Component definitions and system registry.
+- `src/locales/`: i18n translation files (EN/DE).
+- `src/datasets/`: Initial generic schemas and SQL views.
+- `scripts/`: Dynamic schema compilation and build utilities.
 
 ## 🌍 Deployment (GitHub Pages)
 
@@ -78,13 +79,14 @@ This project is optimized for static hosting while maintaining full database fea
 
 1.  **Build**: Execute `npm run build`.
 2.  **COI Headers**: Uses `coi-serviceworker.js` to enable SharedArrayBuffer/OPFS support on GitHub Pages without server-side header configuration.
-3.  **Fallback**: Gracefully falls back to an in-memory database if OPFS is unavailable.
+3.  **Cross-Browser**: Gracefully falls back to an in-memory database if OPFS is unavailable.
 
 ## 🔒 Security & Data Privacy
 
-- **No External Tracking**: No telemetry or external API calls are made.
-- **Local Only**: Your data never leaves your browser unless you explicitly export a backup.
-- **AES-GCM Encryption**: Used for protecting backups and the application lock.
+- **No External Tracking**: Zero-telemetry, zero-API calls architecture.
+- **Local Sovereignty**: Your data remains on your machine; only you can export or share it.
+- **Salted Protection**: The application lock uses unique cryptographic salts per device deployment to protect against brute-force/rainbow table attacks.
+- **AES-GCM Encryption**: Modern authenticated encryption used for backups.
 
 ---
 Built with ❤️ for Data Sovereignty and Insights.

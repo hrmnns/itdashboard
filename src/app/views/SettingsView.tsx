@@ -4,7 +4,7 @@ import { useThemeContext, type ThemeMode } from '../../lib/context/ThemeContext'
 import { PageLayout } from '../components/ui/PageLayout';
 import { Lock, Shield, Trash2, Check, X, Info, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { hashPin } from '../../lib/utils/crypto';
+import { hashPin, generateSalt } from '../../lib/utils/crypto';
 
 export const SettingsView: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -25,8 +25,13 @@ export const SettingsView: React.FC = () => {
             alert(t('settings.pin_error_min'));
             return;
         }
-        const hash = await hashPin(pinInput);
+
+        const salt = generateSalt();
+        const hash = await hashPin(pinInput, salt);
+
+        localStorage.setItem('litebistudio_app_pin_salt', salt);
         localStorage.setItem('litebistudio_app_pin', hash);
+
         setHasPin(true);
         setIsEditingPin(false);
         setPinInput('');
@@ -36,6 +41,7 @@ export const SettingsView: React.FC = () => {
     const handleRemovePin = () => {
         if (window.confirm(t('settings.pin_confirm_remove'))) {
             localStorage.removeItem('litebistudio_app_pin');
+            localStorage.removeItem('litebistudio_app_pin_salt');
             setHasPin(false);
         }
     };

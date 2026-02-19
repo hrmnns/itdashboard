@@ -8,18 +8,21 @@ import standaloneCode from 'ajv/dist/standalone/index.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Paths
-const schemaPath = path.resolve(__dirname, '../src/schemas/invoice-items-schema.json');
+const schemasDir = path.resolve(__dirname, '../src/schemas');
 const outDir = path.resolve(__dirname, '../src/lib/validators');
-const outFile = path.join(outDir, 'invoice-items-validator.js');
 
 // Ensure output directory exists
 if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
 }
 
-// Load Schema
-const schemaContent = fs.readFileSync(schemaPath, 'utf-8');
-const schema = JSON.parse(schemaContent);
+// Get all schemas
+const schemaFiles = fs.readdirSync(schemasDir).filter(f => f.endsWith('.json'));
+
+if (schemaFiles.length === 0) {
+    console.log('No schemas found to compile.');
+    process.exit(0);
+}
 
 // Initialize Ajv with secure settings (code generation)
 const ajv = new Ajv2020({
@@ -34,31 +37,39 @@ const ajv = new Ajv2020({
 
 addFormats(ajv);
 
-// Compile
-const validate = ajv.compile(schema);
-let moduleCode = standaloneCode(ajv, validate);
+for (const file of schemaFiles) {
+    try {
+        const schemaPath = path.join(schemasDir, file);
+        const outFile = path.join(outDir, file.replace('-schema.json', '-validator.js').replace('.json', '-validator.js'));
 
-// Patch: Replace CommonJS require with ESM imports for Vite compatibility
-// 1. Handle ajv-formats
-moduleCode = moduleCode.replace(
-    /const (\w+) = require\("ajv-formats\/dist\/formats"\).fullFormats.date;/g,
-    'import { fullFormats } from "ajv-formats/dist/formats.js"; const $1 = fullFormats.date;'
-);
+        // Load Schema
+        const schemaContent = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = JSON.parse(schemaContent);
 
-// 2. Handle ajv runtime (ucs2length)
-moduleCode = moduleCode.replace(
-    /const (\w+) = require\("ajv\/dist\/runtime\/ucs2length"\).default;/g,
-    'import ucs2length from "ajv/dist/runtime/ucs2length.js"; const $1 = ucs2length;'
-);
+        // Compile
+        const validate = ajv.compile(schema);
+        let moduleCode = standaloneCode(ajv, validate);
 
-// 3. Handle generic require (catch-all for other runtime deps if any)
-// Note: This is risky if strict CJS, but AJV runtime usually exports default
-moduleCode = moduleCode.replace(
-    /const (\w+) = require\("([^"]+)"\).default;/g,
-    'import $1_pkg from "$2.js"; const $1 = $1_pkg;'
-);
+        // Patch: Replace CommonJS require with ESM imports for Vite compatibility
+        moduleCode = moduleCode.replace(
+            /const (\w+) = require\("ajv-formats\/dist\/formats"\).fullFormats.date;/g,
+            'import { fullFormats } from "ajv-formats/dist/formats.js"; const $1 = fullFormats.date;'
+        );
 
-// Write to file
-fs.writeFileSync(outFile, moduleCode);
+        moduleCode = moduleCode.replace(
+            /const (\w+) = require\("ajv\/dist\/runtime\/ucs2length"\).default;/g,
+            'import ucs2length from "ajv/dist/runtime/ucs2length.js"; const $1 = ucs2length;'
+        );
 
-console.log(`✅ Schema compiled to ${outFile}`);
+        moduleCode = moduleCode.replace(
+            /const (\w+) = require\("([^"]+)"\).default;/g,
+            'import $1_pkg from "$2.js"; const $1 = $1_pkg;'
+        );
+
+        // Write to file
+        fs.writeFileSync(outFile, moduleCode);
+        console.log(`✅ ${file} compiled to ${outFile}`);
+    } catch (e) {
+        console.error(`❌ Failed to compile ${file}:`, e.message);
+    }
+}

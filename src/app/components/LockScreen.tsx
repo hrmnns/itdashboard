@@ -16,13 +16,15 @@ export const LockScreen: React.FC = () => {
         if (e) e.preventDefault();
 
         const storedHash = localStorage.getItem('litebistudio_app_pin');
+        const salt = localStorage.getItem('litebistudio_app_pin_salt') || ''; // Default to empty for backward compatibility (pre-1.0 unsalted)
+
         if (!storedHash) {
             // Should not happen if isLocked is true, but safe fallback
             unlockApp();
             return;
         }
 
-        const inputHash = await hashPin(pin);
+        const inputHash = await hashPin(pin, salt);
         if (inputHash === storedHash) {
             unlockApp();
             setPin('');
