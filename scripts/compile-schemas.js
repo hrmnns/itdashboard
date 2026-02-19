@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Ajv2020 from 'ajv/dist/2020.js';
+import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import standaloneCode from 'ajv/dist/standalone/index.js';
 
@@ -25,7 +25,7 @@ if (schemaFiles.length === 0) {
 }
 
 // Initialize Ajv with secure settings (code generation)
-const ajv = new Ajv2020({
+const ajv = new Ajv({
     code: {
         source: true,
         esm: true,
