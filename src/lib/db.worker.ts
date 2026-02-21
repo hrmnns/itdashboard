@@ -9,6 +9,80 @@ let initPromise: Promise<any> | null = null;
 const log = (...args: any[]) => console.log('[DB Worker]', ...args);
 const error = (...args: any[]) => console.error('[DB Worker]', ...args);
 
+// Reusable schema and migration logic
+function applyMigrations(databaseInstance: any) {
+    if (!databaseInstance) return;
+
+    log('Applying schema and migrations...');
+    // Initialize infrastructure schema
+    databaseInstance.exec(schemaSql);
+
+    // Migration: sys_user_widgets -> visual_builder_config
+    try {
+        const columns: any[] = [];
+        databaseInstance.exec({
+            sql: "PRAGMA table_info(sys_user_widgets)",
+            rowMode: 'object',
+            callback: (row: any) => columns.push(row.name)
+        });
+        if (columns.length > 0 && !columns.includes('visual_builder_config')) {
+            databaseInstance.exec("ALTER TABLE sys_user_widgets ADD COLUMN visual_builder_config TEXT");
+            log('Migrated sys_user_widgets: Added visual_builder_config');
+        }
+    } catch (e) {
+        error('Migration failed for sys_user_widgets', e);
+    }
+
+    // Migration: sys_worklist enhancements
+    try {
+        const columns: any[] = [];
+        databaseInstance.exec({
+            sql: "PRAGMA table_info(sys_worklist)",
+            rowMode: 'object',
+            callback: (row: any) => columns.push(row.name)
+        });
+        if (columns.length > 0) {
+            if (!columns.includes('comment')) {
+                databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN comment TEXT");
+                log('Migrated sys_worklist: Added comment');
+            }
+            if (!columns.includes('updated_at')) {
+                // SQLite doesn't allow CURRENT_TIMESTAMP as a default when adding a column via ALTER TABLE
+                databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN updated_at TIMESTAMP");
+                databaseInstance.exec("UPDATE sys_worklist SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL");
+                log('Migrated sys_worklist: Added updated_at');
+            }
+        }
+    } catch (e) {
+        error('Migration failed for sys_worklist', e);
+    }
+
+    // Migration: sys_report_packs
+    try {
+        databaseInstance.exec(`
+            CREATE TABLE IF NOT EXISTS sys_report_packs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                config TEXT, -- JSON string of ReportPackConfig
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+    } catch (e) {
+        error('Migration failed for sys_report_packs', e);
+    }
+
+    // Views might depend on tables that don't exist yet, we should probably wrap this or make it on-demand
+    try {
+        databaseInstance.exec(viewsSql);
+    } catch (e) {
+        log('Warning: views.sql execution partially or fully failed (expected if source tables are missing)');
+    }
+
+    log('Generic Schema and migrations initialized/verified');
+}
+
 async function initDB() {
     if (db) return;
     if (initPromise) return initPromise;
@@ -48,73 +122,9 @@ async function initDB() {
                 db = new sqlite3.oo1.DB(':memory:');
             }
 
-            // Initialize infrastructure schema
-            db.exec(schemaSql);
+            // Apply schema and migrations
+            applyMigrations(db);
 
-            // Migration: sys_user_widgets -> visual_builder_config
-            try {
-                const columns: any[] = [];
-                db.exec({
-                    sql: "PRAGMA table_info(sys_user_widgets)",
-                    rowMode: 'object',
-                    callback: (row: any) => columns.push(row.name)
-                });
-                if (columns.length > 0 && !columns.includes('visual_builder_config')) {
-                    db.exec("ALTER TABLE sys_user_widgets ADD COLUMN visual_builder_config TEXT");
-                    log('Migrated sys_user_widgets: Added visual_builder_config');
-                }
-            } catch (e) {
-                error('Migration failed for sys_user_widgets', e);
-            }
-
-            // Migration: sys_worklist enhancements
-            try {
-                const columns: any[] = [];
-                db.exec({
-                    sql: "PRAGMA table_info(sys_worklist)",
-                    rowMode: 'object',
-                    callback: (row: any) => columns.push(row.name)
-                });
-                if (columns.length > 0) {
-                    if (!columns.includes('comment')) {
-                        db.exec("ALTER TABLE sys_worklist ADD COLUMN comment TEXT");
-                        log('Migrated sys_worklist: Added comment');
-                    }
-                    if (!columns.includes('updated_at')) {
-                        // SQLite doesn't allow CURRENT_TIMESTAMP as a default when adding a column via ALTER TABLE
-                        db.exec("ALTER TABLE sys_worklist ADD COLUMN updated_at TIMESTAMP");
-                        db.exec("UPDATE sys_worklist SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL");
-                        log('Migrated sys_worklist: Added updated_at');
-                    }
-                }
-            } catch (e) {
-                error('Migration failed for sys_worklist', e);
-            }
-
-            // Migration: sys_report_packs
-            try {
-                db.exec(`
-                    CREATE TABLE IF NOT EXISTS sys_report_packs (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        description TEXT,
-                        config TEXT, -- JSON string of ReportPackConfig
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                `);
-            } catch (e) {
-                error('Migration failed for sys_report_packs', e);
-            }
-
-            // Views might depend on tables that don't exist yet, we should probably wrap this or make it on-demand
-            try {
-                db.exec(viewsSql);
-            } catch (e) {
-                log('Warning: views.sql execution partially or fully failed (expected if source tables are missing)');
-            }
-
-            log('Generic Schema initialized');
             return true;
         } catch (e) {
             error('Initialization failed', e);
@@ -428,6 +438,14 @@ async function importDatabase(buffer: ArrayBuffer) {
             const writable = await fileHandle.createWritable();
             await writable.write(buffer);
             await writable.close();
+
+            // Re-open the main database instance for subsequent queries
+            db = new sqlite3.oo1.OpfsDb('/litebistudio.sqlite3');
+
+            // Critical: Apply migrations to the newly restored database
+            // This ensures older backups get new tables like sys_dashboards
+            applyMigrations(db);
+
             log('Database imported and validated');
         }
 

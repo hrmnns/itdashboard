@@ -27,7 +27,7 @@
     },
     "sidebar": {
         "dashboard": "Übersicht",
-        "worklist": "Worklist",
+        "worklist": "Arbeitsvorrat",
         "data_inspector": "Data Inspector",
         "query_builder": "Query Builder",
         "datasource": "Datenverwaltung",
@@ -80,9 +80,9 @@
         "filter_done": "Erledigt",
         "found_count": "{{count}} Einträge gefunden",
         "empty_msg": "Keine Einträge",
-        "empty_hint": "Deine Worklist ist aktuell leer oder durch Filter eingeschränkt.",
+        "empty_hint": "Dein Arbeitsvorrat ist aktuell leer oder durch Filter eingeschränkt.",
         "details_btn": "Details öffnen",
-        "remove_btn": "Von Worklist entfernen",
+        "remove_btn": "Vom Arbeitsvorrat entfernen",
         "entry_id": "Eintrag #{{id}}",
         "comment_present": "Kommentar vorhanden"
     },
