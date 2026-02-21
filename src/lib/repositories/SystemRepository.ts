@@ -2,6 +2,8 @@ import { runQuery, notifyDbChange } from '../db';
 import type { TableColumn } from '../../types';
 import { isValidIdentifier } from '../utils';
 
+const schemaCache = new Map<string, TableColumn[]>();
+
 export const SystemRepository = {
     async getDatabaseStats(): Promise<{ tables: number; records: number }> {
         const tables = await this.getTables();
@@ -28,7 +30,12 @@ export const SystemRepository = {
     },
 
     async getTableSchema(tableName: string): Promise<TableColumn[]> {
-        return await runQuery(`PRAGMA table_info(${tableName})`) as unknown as TableColumn[];
+        if (!isValidIdentifier(tableName)) return [];
+        if (schemaCache.has(tableName)) return schemaCache.get(tableName)!;
+
+        const result = await runQuery(`PRAGMA table_info("${tableName}")`) as unknown as TableColumn[];
+        schemaCache.set(tableName, result);
+        return result;
     },
 
     async inspectTable(tableName: string, limit: number, searchTerm?: string): Promise<any[]> {
@@ -198,10 +205,27 @@ export const SystemRepository = {
     async checkRecordExists(tableName: string, id: string | number): Promise<boolean> {
         if (!isValidIdentifier(tableName)) return false;
         try {
-            const result = await runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ?`, [id]);
+            // Using a more efficient check and ensuring table name is quoted
+            const result = await runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]);
             return result.length > 0;
         } catch (e) {
             return false;
         }
+    },
+
+    async getRecordMetadata(tableName: string, id: string | number): Promise<{ exists: boolean; isInWorklist: boolean; worklistItem: any | null }> {
+        if (!isValidIdentifier(tableName)) return { exists: false, isInWorklist: false, worklistItem: null };
+
+        // Combine existence check and worklist check into a single call (or parallel)
+        const [existsResult, worklistResult] = await Promise.all([
+            runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]),
+            runQuery('SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?', [tableName, id])
+        ]);
+
+        return {
+            exists: existsResult.length > 0,
+            isInWorklist: worklistResult.length > 0,
+            worklistItem: worklistResult[0] || null
+        };
     }
 };

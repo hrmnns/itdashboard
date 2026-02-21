@@ -33,6 +33,13 @@ export function useAsync<T>(
     const [version, setVersion] = useState(0);
     const lastFetchId = useRef(0);
 
+    // Always keep the latest asyncFunction to prevent stale closures
+    // when triggered by global events (like db-updated)
+    const asyncFuncRef = useRef(asyncFunction);
+    useEffect(() => {
+        asyncFuncRef.current = asyncFunction;
+    });
+
     const refresh = useCallback(() => {
         setVersion(v => v + 1);
     }, []);
@@ -49,7 +56,7 @@ export function useAsync<T>(
                     setLoading(true);
                 }
 
-                const result = await asyncFunction();
+                const result = await asyncFuncRef.current();
 
                 if (mounted && fetchId === lastFetchId.current) {
                     setData(result);

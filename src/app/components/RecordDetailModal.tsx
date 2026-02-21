@@ -101,16 +101,10 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const checkStatus = async () => {
             const currentItem = items[currentIndex];
             if (currentItem?.id && activeTable !== 'unknown') {
-                const result = await SystemRepository.executeRaw(
-                    'SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-                    [activeTable, currentItem.id]
-                );
-                setIsInWorklist(result.length > 0);
-                setWorklistItem(result[0] || null);
-
-                // Check existence
-                const exists = await SystemRepository.checkRecordExists(activeTable, currentItem.id);
-                setRecordExists(exists);
+                const metadata = await SystemRepository.getRecordMetadata(activeTable, currentItem.id);
+                setIsInWorklist(metadata.isInWorklist);
+                setWorklistItem(metadata.worklistItem);
+                setRecordExists(metadata.exists);
             } else {
                 setRecordExists(null);
                 setWorklistItem(null);
@@ -126,36 +120,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         const currentItem = items[currentIndex];
         if (!currentItem?.id) return;
 
-        // Label: Use generic label detection or fallback to ID
-        const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
-        let label = '';
-        for (const candidate of labelCandidates) {
-            // Find key case-insensitive
-            const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
-            if (actualKey && currentItem[actualKey]) {
-                label = String(currentItem[actualKey]);
-                break;
-            }
-        }
-        if (!label) label = t('worklist.entry_id', { id: currentItem.id });
-
-        // Context: Use generic period/category or Table
-        const contextCandidates = ['period', 'fiscalyear', 'category', 'type', 'group', 'Period'];
-        let context = activeTable;
-        for (const candidate of contextCandidates) {
-            const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
-            if (actualKey && currentItem[actualKey]) {
-                context = String(currentItem[actualKey]);
-                break;
-            }
-        }
-
-        const existing = await SystemRepository.executeRaw(
-            'SELECT id FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-            [activeTable, currentItem.id]
-        );
-
-        if (existing.length > 0) {
+        if (isInWorklist) {
             await SystemRepository.executeRaw(
                 'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
                 [activeTable, currentItem.id]
@@ -163,22 +128,42 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
             setIsInWorklist(false);
             setWorklistItem(null);
         } else {
+            // Label: Use generic label detection or fallback to ID
+            const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
+            let label = '';
+            for (const candidate of labelCandidates) {
+                // Find key case-insensitive
+                const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+                if (actualKey && currentItem[actualKey]) {
+                    label = String(currentItem[actualKey]);
+                    break;
+                }
+            }
+            if (!label) label = t('worklist.entry_id', { id: currentItem.id });
+
+            // Context: Use generic period/category or Table
+            const contextCandidates = ['period', 'fiscalyear', 'category', 'type', 'group', 'Period'];
+            let context = activeTable;
+            for (const candidate of contextCandidates) {
+                const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+                if (actualKey && currentItem[actualKey]) {
+                    context = String(currentItem[actualKey]);
+                    break;
+                }
+            }
+
             await SystemRepository.executeRaw(
                 'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
                 [activeTable, currentItem.id, label, context]
             );
 
-            // Re-fetch to get the newly created ID for status/comment updates
-            const newItem = await SystemRepository.executeRaw(
-                'SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-                [activeTable, currentItem.id]
-            );
+            // Fetch the newly created item once
+            const metadata = await SystemRepository.getRecordMetadata(activeTable, currentItem.id);
             setIsInWorklist(true);
-            setWorklistItem(newItem[0] || null);
+            setWorklistItem(metadata.worklistItem);
         }
 
-        // Trigger global sync for counters etc.
-        window.dispatchEvent(new Event('db-updated'));
+        // Global db-changed event is automatically fired via SystemRepository
     };
 
     const handleToggleReference = () => {
@@ -308,8 +293,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                                 setWorklistItem({ ...worklistItem, status: newStatus });
                                                 try {
                                                     await SystemRepository.updateWorklistItem(worklistItem.id, { status: newStatus });
-                                                    // Trigger global sync for widget/other views
-                                                    window.dispatchEvent(new Event('db-updated'));
+                                                    // Global db-changed is automatically fired
                                                 } catch (err) {
                                                     console.error('Failed to update status', err);
                                                 }
@@ -333,8 +317,7 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                                             if (worklistItem) {
                                                 try {
                                                     await SystemRepository.updateWorklistItem(worklistItem.id, { comment: e.target.value });
-                                                    // Trigger global sync for widget/other views
-                                                    window.dispatchEvent(new Event('db-updated'));
+                                                    // Global db-changed is automatically fired
                                                 } catch (err) {
                                                     console.error('Failed to update comment', err);
                                                 }
