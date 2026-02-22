@@ -72,7 +72,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({ onBack }) => {
     const columns: any[] = React.useMemo(() => {
         if (!items || items.length === 0) return [];
 
-        const keys = Object.keys(items[0]);
+        const keys = Object.keys(items[0]).filter(k => k !== '_rowid');
         return keys.map(key => {
             const isAmount = key.toLowerCase().includes('amount') || key.toLowerCase().includes('price');
             const isId = key.toLowerCase().includes('id');

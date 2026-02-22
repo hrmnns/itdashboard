@@ -476,6 +476,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                         try {
                                                             const { importDatabase } = await import('../../lib/db');
                                                             const report = await importDatabase(finalBuffer) as any;
+                                                            const { versionInfo } = report;
 
                                                             if (!report.headerMatch) {
                                                                 setRestoreAlert({
@@ -489,14 +490,18 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             if (report.error) {
                                                                 setRestoreAlert({
                                                                     type: 'error',
-                                                                    title: t('common.error'),
-                                                                    message: report.error
+                                                                    title: report.isDowngrade ? 'Incompatible Backup' : t('common.error'),
+                                                                    message: report.error,
+                                                                    details: versionInfo ? `Backup Version: V${versionInfo.backup} | App Version: V${versionInfo.current}` : undefined
                                                                 });
                                                                 return;
                                                             }
 
                                                             if (!report.isValid) {
                                                                 let details = "";
+                                                                if (versionInfo) {
+                                                                    details += `Schema: V${versionInfo.backup} → V${versionInfo.current} (Update required)\n\n`;
+                                                                }
                                                                 if (report.missingTables.length > 0) {
                                                                     details += t('datasource.restore_missing_tables') + '\n- ' + report.missingTables.join('\n- ') + '\n\n';
                                                                 }
@@ -518,7 +523,8 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                 setRestoreAlert({
                                                                     type: 'success',
                                                                     title: t('common.success'),
-                                                                    message: t('datasource.restore_success_reload')
+                                                                    message: t('datasource.restore_success_reload'),
+                                                                    details: versionInfo ? `Database Version: V${versionInfo.backup} (Upgraded to V${versionInfo.current})` : undefined
                                                                 });
                                                                 setTimeout(() => window.location.reload(), 2000);
                                                             }

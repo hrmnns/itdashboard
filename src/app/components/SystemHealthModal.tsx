@@ -86,6 +86,12 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({ isOpen, on
                                         <span className="text-slate-500 dark:text-slate-400">{t('widgets.system_health.version')}</span>
                                         <span className="font-mono font-medium text-slate-900 dark:text-white">{version}</span>
                                     </div>
+                                    {diagnostics?.schemaVersion !== undefined && (
+                                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-2">
+                                            <span className="text-slate-500 dark:text-slate-400">Database Schema</span>
+                                            <span className="font-mono font-bold text-blue-600 dark:text-blue-400">V{diagnostics.schemaVersion}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between border-b border-slate-200 dark:border-slate-700/50 pb-2">
                                         <span className="text-slate-500 dark:text-slate-400">{t('widgets.system_health.build_date')}</span>
                                         <span className="font-mono font-medium text-slate-900 dark:text-white">{buildDate}</span>

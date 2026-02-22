@@ -9,78 +9,118 @@ let initPromise: Promise<any> | null = null;
 const log = (...args: any[]) => console.log('[DB Worker]', ...args);
 const error = (...args: any[]) => console.error('[DB Worker]', ...args);
 
+const CURRENT_SCHEMA_VERSION = 5;
+
 // Reusable schema and migration logic
 function applyMigrations(databaseInstance: any) {
     if (!databaseInstance) return;
 
-    log('Applying schema and migrations...');
-    // Initialize infrastructure schema
-    databaseInstance.exec(schemaSql);
+    let userVersion = databaseInstance.selectValue('PRAGMA user_version') as number;
+    log(`Current database schema version: ${userVersion} (Target: ${CURRENT_SCHEMA_VERSION})`);
 
-    // Migration: sys_user_widgets -> visual_builder_config
-    try {
-        const columns: any[] = [];
-        databaseInstance.exec({
-            sql: "PRAGMA table_info(sys_user_widgets)",
-            rowMode: 'object',
-            callback: (row: any) => columns.push(row.name)
-        });
-        if (columns.length > 0 && !columns.includes('visual_builder_config')) {
-            databaseInstance.exec("ALTER TABLE sys_user_widgets ADD COLUMN visual_builder_config TEXT");
-            log('Migrated sys_user_widgets: Added visual_builder_config');
-        }
-    } catch (e) {
-        error('Migration failed for sys_user_widgets', e);
+    if (userVersion >= CURRENT_SCHEMA_VERSION) {
+        log('Database is up to date.');
+        return;
     }
 
-    // Migration: sys_worklist enhancements
-    try {
-        const columns: any[] = [];
-        databaseInstance.exec({
-            sql: "PRAGMA table_info(sys_worklist)",
-            rowMode: 'object',
-            callback: (row: any) => columns.push(row.name)
-        });
-        if (columns.length > 0) {
-            if (!columns.includes('comment')) {
-                databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN comment TEXT");
-                log('Migrated sys_worklist: Added comment');
+    // Version 1: Initial core tables
+    if (userVersion < 1) {
+        log('Migration V1: Initializing infrastructure schema...');
+        databaseInstance.exec(schemaSql);
+        databaseInstance.exec('PRAGMA user_version = 1');
+        userVersion = 1;
+    }
+
+    // Version 2: Migration: sys_user_widgets -> visual_builder_config
+    if (userVersion < 2) {
+        log('Migration V2: Adding visual_builder_config to sys_user_widgets...');
+        try {
+            const columns: any[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_user_widgets)",
+                rowMode: 'object',
+                callback: (row: any) => columns.push(row.name)
+            });
+            if (columns.length > 0 && !columns.includes('visual_builder_config')) {
+                databaseInstance.exec("ALTER TABLE sys_user_widgets ADD COLUMN visual_builder_config TEXT");
             }
-            if (!columns.includes('updated_at')) {
-                // SQLite doesn't allow CURRENT_TIMESTAMP as a default when adding a column via ALTER TABLE
-                databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN updated_at TIMESTAMP");
-                databaseInstance.exec("UPDATE sys_worklist SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL");
-                log('Migrated sys_worklist: Added updated_at');
-            }
+        } catch (e) {
+            error('Migration failed for V2', e);
         }
-    } catch (e) {
-        error('Migration failed for sys_worklist', e);
+        databaseInstance.exec('PRAGMA user_version = 2');
+        userVersion = 2;
     }
 
-    // Migration: sys_report_packs
-    try {
-        databaseInstance.exec(`
-            CREATE TABLE IF NOT EXISTS sys_report_packs (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT,
-                config TEXT, -- JSON string of ReportPackConfig
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-    } catch (e) {
-        error('Migration failed for sys_report_packs', e);
+    // Version 3: Migration: sys_worklist enhancements
+    if (userVersion < 3) {
+        log('Migration V3: Enhancing sys_worklist...');
+        try {
+            const columns: any[] = [];
+            databaseInstance.exec({
+                sql: "PRAGMA table_info(sys_worklist)",
+                rowMode: 'object',
+                callback: (row: any) => columns.push(row.name)
+            });
+            if (columns.length > 0) {
+                if (!columns.includes('comment')) {
+                    databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN comment TEXT");
+                }
+                if (!columns.includes('updated_at')) {
+                    databaseInstance.exec("ALTER TABLE sys_worklist ADD COLUMN updated_at TIMESTAMP");
+                    databaseInstance.exec("UPDATE sys_worklist SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL");
+                }
+            }
+        } catch (e) {
+            error('Migration failed for V3', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 3');
+        userVersion = 3;
     }
 
-    // Views might depend on tables that don't exist yet, we should probably wrap this or make it on-demand
-    try {
-        databaseInstance.exec(viewsSql);
-    } catch (e) {
-        log('Warning: views.sql execution partially or fully failed (expected if source tables are missing)');
+    // Version 4: Migration: sys_report_packs and sys_dashboards
+    if (userVersion < 4) {
+        log('Migration V4: Adding sys_report_packs and sys_dashboards...');
+        try {
+            databaseInstance.exec(`
+                CREATE TABLE IF NOT EXISTS sys_report_packs (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    config TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS sys_dashboards (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    layout TEXT,
+                    is_default INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            `);
+        } catch (e) {
+            error('Migration failed for V4', e);
+        }
+        databaseInstance.exec('PRAGMA user_version = 4');
+        userVersion = 4;
     }
 
-    log('Generic Schema and migrations initialized/verified');
+    // Version 5: Introduction of the versioning system itself
+    if (userVersion < 5) {
+        log('Migration V5: Finalizing versioning system...');
+        try {
+            // Apply views as they might depend on new tables
+            databaseInstance.exec(viewsSql);
+        } catch (e) {
+            log('Warning: views.sql execution partially or fully failed');
+        }
+        databaseInstance.exec('PRAGMA user_version = 5');
+        userVersion = 5;
+    }
+
+    log(`Database migrated to version ${userVersion}`);
 }
 
 async function initDB() {
@@ -342,7 +382,8 @@ function getDiagnostics() {
         dbSize,
         pageCount,
         pageSize,
-        tableStats
+        tableStats,
+        schemaVersion: db.selectValue('PRAGMA user_version') as number
     };
 }
 
@@ -380,6 +421,13 @@ async function importDatabase(buffer: ArrayBuffer) {
             return report;
         }
 
+        // Read user_version from the backup
+        const backupVersion = tempDb.selectValue('PRAGMA user_version') as number || 0;
+        report.versionInfo = {
+            current: CURRENT_SCHEMA_VERSION,
+            backup: backupVersion
+        };
+
         // Extract expected tables from schemaSql
         const expectedTables = schemaSql
             .split(';')
@@ -404,8 +452,6 @@ async function importDatabase(buffer: ArrayBuffer) {
                 callback: (row: any) => actualCols.push(row.name)
             });
 
-            // Get desired columns from master schema (we need a way to parse schemaSql properly, 
-            // but for now we'll check the current DB's schema as reference if available)
             if (db) {
                 const targetCols: string[] = [];
                 db.exec({
@@ -421,7 +467,15 @@ async function importDatabase(buffer: ArrayBuffer) {
             }
         }
 
-        report.isValid = report.missingTables.length === 0 && Object.keys(report.missingColumns).length === 0;
+        // Downgrade protection: Prevent importing newer backups into older apps
+        if (backupVersion > CURRENT_SCHEMA_VERSION) {
+            report.isValid = false;
+            report.isDowngrade = true;
+            report.error = `The backup (V${backupVersion}) is newer than this application (V${CURRENT_SCHEMA_VERSION}). Please update the application first.`;
+        } else {
+            report.isValid = report.missingTables.length === 0;
+            // Note: missingColumns is informative, we upgrade them during applyMigrations anyway
+        }
 
         // 3. Finalize Import (write to OPFS)
         if (sqlite3.oo1.OpfsDb) {

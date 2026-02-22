@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
-import { ChevronLeft, ChevronRight, Info, Bookmark, Target, AlertCircle } from 'lucide-react';
+import { Bookmark, Info, Target, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 import { SystemRepository } from '../../lib/repositories/SystemRepository';
 
 import { SchemaTable } from './SchemaDocumentation';
@@ -34,6 +34,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     const [worklistItem, setWorklistItem] = useState<any>(null);
     const [recordExists, setRecordExists] = useState<boolean | null>(null);
     const [resolvedSchema, setResolvedSchema] = useState<any>(null);
+
+    // Prevent double clicks during worklist toggle
+    const [isActionLoading, setIsActionLoading] = useState(false);
 
     const modalTitle = title || t('record_detail.title');
 
@@ -100,8 +103,9 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     useEffect(() => {
         const checkStatus = async () => {
             const currentItem = items[currentIndex];
-            if (currentItem?.id && activeTable !== 'unknown') {
-                const metadata = await SystemRepository.getRecordMetadata(activeTable, currentItem.id);
+            if (currentItem) {
+                const recordId = getRecordIdValue(currentItem);
+                const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
                 setIsInWorklist(metadata.isInWorklist);
                 setWorklistItem(metadata.worklistItem);
                 setRecordExists(metadata.exists);
@@ -116,54 +120,84 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
         }
     }, [isOpen, currentIndex, items, activeTable]);
 
+    const getRecordIdValue = (item: any) => {
+        if (!item) return null;
+        // 0. Hidden RowID from inspectTable (most reliable for tables without PK)
+        if (item._rowid !== undefined && item._rowid !== null) return item._rowid;
+
+        // 1. Explicit ID column (case-insensitive)
+        const idKey = Object.keys(item).find(k => k.toLowerCase() === 'id' || k.toLowerCase() === 'entryid' || k.toLowerCase() === 'rowid');
+        if (idKey && (item[idKey] !== undefined && item[idKey] !== null)) return item[idKey];
+
+        // 2. Fallback: Any column that looks like an ID
+        const fallbackIdKey = Object.keys(item).find(k => k.toLowerCase().endsWith('_id') || k.toLowerCase().endsWith('id'));
+        if (fallbackIdKey && (item[fallbackIdKey] !== undefined && item[fallbackIdKey] !== null)) return item[fallbackIdKey];
+
+        return null;
+    };
+
     const handleToggleWorklist = async () => {
+        if (isActionLoading) return;
         const currentItem = items[currentIndex];
-        if (!currentItem?.id) return;
+        const recordId = getRecordIdValue(currentItem);
 
-        if (isInWorklist) {
-            await SystemRepository.executeRaw(
-                'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
-                [activeTable, currentItem.id]
-            );
-            setIsInWorklist(false);
-            setWorklistItem(null);
-        } else {
-            // Label: Use generic label detection or fallback to ID
-            const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
-            let label = '';
-            for (const candidate of labelCandidates) {
-                // Find key case-insensitive
-                const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
-                if (actualKey && currentItem[actualKey]) {
-                    label = String(currentItem[actualKey]);
-                    break;
-                }
-            }
-            if (!label) label = t('worklist.entry_id', { id: currentItem.id });
-
-            // Context: Use generic period/category or Table
-            const contextCandidates = ['period', 'fiscalyear', 'category', 'type', 'group', 'Period'];
-            let context = activeTable;
-            for (const candidate of contextCandidates) {
-                const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
-                if (actualKey && currentItem[actualKey]) {
-                    context = String(currentItem[actualKey]);
-                    break;
-                }
-            }
-
-            await SystemRepository.executeRaw(
-                'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
-                [activeTable, currentItem.id, label, context]
-            );
-
-            // Fetch the newly created item once
-            const metadata = await SystemRepository.getRecordMetadata(activeTable, currentItem.id);
-            setIsInWorklist(true);
-            setWorklistItem(metadata.worklistItem);
+        if (!recordId) {
+            console.warn('[RecordDetail] Cannot toggle worklist: No unique ID found for record', currentItem);
+            return;
         }
 
-        // Global db-changed event is automatically fired via SystemRepository
+        setIsActionLoading(true);
+        try {
+            if (isInWorklist) {
+                await SystemRepository.executeRaw(
+                    'DELETE FROM sys_worklist WHERE source_table = ? AND source_id = ?',
+                    [activeTable, recordId]
+                );
+                setIsInWorklist(false);
+                setWorklistItem(null);
+            } else {
+                // Label: Use generic label detection or fallback to ID
+                const labelCandidates = ['name', 'title', 'description', 'label', 'display_name', 'VendorName', 'Description'];
+                let label = '';
+                for (const candidate of labelCandidates) {
+                    // Find key case-insensitive
+                    const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+                    if (actualKey && currentItem[actualKey]) {
+                        label = String(currentItem[actualKey]);
+                        break;
+                    }
+                }
+                if (!label) label = t('worklist.entry_id', { id: recordId });
+
+                // Context: Use generic period/category or Table
+                const contextCandidates = ['period', 'fiscalyear', 'category', 'type', 'group', 'Period'];
+                let context = activeTable;
+                for (const candidate of contextCandidates) {
+                    const actualKey = Object.keys(currentItem).find(k => k.toLowerCase() === candidate.toLowerCase());
+                    if (actualKey && currentItem[actualKey]) {
+                        context = String(currentItem[actualKey]);
+                        break;
+                    }
+                }
+
+                await SystemRepository.executeRaw(
+                    'INSERT INTO sys_worklist (source_table, source_id, display_label, display_context) VALUES (?, ?, ?, ?)',
+                    [activeTable, recordId, label, context]
+                );
+
+                // Fetch the newly created item once
+                const metadata = await SystemRepository.getRecordMetadata(activeTable, recordId);
+                setIsInWorklist(true);
+                setWorklistItem(metadata.worklistItem);
+            }
+
+            // Explicity dispatch db-changed so widgets update since executeRaw bypasses it
+            window.dispatchEvent(new Event('db-changed'));
+        } catch (err) {
+            console.error('Failed to toggle worklist status', err);
+        } finally {
+            setIsActionLoading(false);
+        }
     };
 
     const handleToggleReference = () => {
@@ -219,13 +253,18 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                             )}
                             <button
                                 onClick={handleToggleWorklist}
-                                className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isInWorklist
+                                disabled={isActionLoading}
+                                className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${isActionLoading ? 'opacity-50 cursor-not-allowed' : ''} ${isInWorklist
                                     ? 'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
                                     : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700'
                                     }`}
                                 title={isInWorklist ? t('record_detail.remove_worklist') : t('record_detail.add_worklist')}
                             >
-                                <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
+                                {isActionLoading ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Bookmark className={`w-4 h-4 ${isInWorklist ? 'fill-current' : ''}`} />
+                                )}
                             </button>
 
                             <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />

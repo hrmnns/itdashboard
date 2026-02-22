@@ -2,7 +2,6 @@ import DBWorker from './db.worker?worker';
 import type { DbRow } from '../types';
 
 let worker: Worker | null = null;
-let workerReadyPromise: Promise<Worker> | null = null;
 let msgId = 0;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pending = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
@@ -27,14 +26,11 @@ channel.onmessage = async (event) => {
             processTabConflict();
         }
     } else if (event.data && event.data.type === 'RPC_REQ' && isMaster) {
-        const { id, sql, bind } = event.data;
-        if (!sql.toUpperCase().trimStart().startsWith('SELECT') && !sql.toUpperCase().trimStart().startsWith('PRAGMA')) {
-            channel.postMessage({ type: 'RPC_RES', id, error: 'Only SELECT and PRAGMA are allowed in read-only mode.' });
-            return;
-        }
+        const { id, actionType, payload } = event.data;
+        // Proxy the request as if it were called on the master tab
         try {
-            const rows = await runQuery(sql, bind);
-            channel.postMessage({ type: 'RPC_RES', id, result: rows });
+            const result = await send(actionType, payload);
+            channel.postMessage({ type: 'RPC_RES', id, result: result });
         } catch (e: any) {
             channel.postMessage({ type: 'RPC_RES', id, error: e.message });
         }
@@ -50,9 +46,6 @@ channel.onmessage = async (event) => {
 };
 
 let readOnlyResolve: (() => void) | null = null;
-const readOnlyPromise = new Promise<void>((resolve) => {
-    readOnlyResolve = resolve;
-});
 
 const lockAbortController = new AbortController();
 
@@ -92,17 +85,42 @@ export function onTabConflict(callback: (hasConflict: boolean, isReadOnly: boole
 
 channel.postMessage({ type: 'PING', instanceId });
 
-function getWorker(): Promise<Worker> {
-    if (!workerReadyPromise) {
-        workerReadyPromise = new Promise((resolveWorker, rejectWorker) => {
-            navigator.locks.request('litebistudio_db_lifecycle', { signal: lockAbortController.signal }, async () => {
-                if (isReadOnlyMode) {
-                    // This tab entered read-only mode while waiting in the lock queue.
-                    // Release the lock immediately so another tab can be master.
-                    rejectWorker(new Error('Switched to Read-Only mode'));
+let lifecycleInitPromise: Promise<void> | null = null;
+
+function getWorker(): Promise<Worker | 'SLAVE'> {
+    if (!lifecycleInitPromise) {
+        lifecycleInitPromise = new Promise((resolveLifecycle) => {
+            // Check if we can become master. 
+            // Note: 'ifAvailable' and 'signal' cannot be used together.
+            navigator.locks.request('litebistudio_db_lifecycle', { ifAvailable: true }, async (lock) => {
+                if (!lock) {
+                    // Lock is already held by another tab. We are a slave.
+                    isMaster = false;
+                    resolveLifecycle();
+
+                    // Request the lock normally in the background (hidden queue)
+                    // so we take over if the current master tab is closed.
+                    // Here we CAN use the signal to cancel if this tab enters explicit Read-Only mode.
+                    try {
+                        await navigator.locks.request('litebistudio_db_lifecycle', { signal: lockAbortController.signal }, async () => {
+                            console.log('[DB] Previous master tab closed. Reloading to take over...');
+                            window.location.reload();
+                        });
+                    } catch (e: any) {
+                        if (e.name !== 'AbortError') console.error('[DB] Background lock request failed:', e);
+                    }
                     return;
                 }
 
+                if (isReadOnlyMode) {
+                    // We got the lock but the tab already switched to read-only.
+                    // Release it immediately so others can take it.
+                    isMaster = false;
+                    resolveLifecycle();
+                    return;
+                }
+
+                // We acquired the lock. We are the master.
                 isMaster = true;
                 const w = new DBWorker();
                 w.onmessage = (e) => {
@@ -115,20 +133,21 @@ function getWorker(): Promise<Worker> {
                     }
                 };
                 worker = w;
-                resolveWorker(w);
+                resolveLifecycle();
+
+                // Hold the lock forever
                 await new Promise(() => { });
             }).catch(err => {
-                if (err.name === 'AbortError') {
-                    // Expected when user opts into read-only mode
-                    rejectWorker(err);
-                } else {
+                if (err.name !== 'AbortError') {
                     console.error('Failed to acquire DB lock:', err);
-                    rejectWorker(err);
                 }
+                isMaster = false;
+                resolveLifecycle();
             });
         });
     }
-    return workerReadyPromise;
+
+    return lifecycleInitPromise.then(() => (isMaster && worker) ? worker : 'SLAVE');
 }
 
 window.addEventListener('beforeunload', () => {
@@ -147,32 +166,46 @@ if (import.meta.hot) {
 }
 
 function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | ArrayBuffer): Promise<T> {
-    const handleReadOnly = () => {
-        if (type === 'EXEC' && payload && 'sql' in payload) {
-            return new Promise<T>((resolve, reject) => {
-                const id = ++msgId;
-                pending.set(id, { resolve, reject });
-                channel.postMessage({ type: 'RPC_REQ', id, sql: payload.sql, bind: payload.bind });
+    const handleSlaveRpc = () => {
+        // If we are in explicit Read-Only mode (user accepted the conflict),
+        // we restrict destructive actions.
+        if (isReadOnlyMode) {
+            if (type === 'EXEC' && payload && 'sql' in (payload as any)) {
+                const sql = (payload as any).sql.toUpperCase().trimStart();
+                if (!sql.startsWith('SELECT') && !sql.startsWith('PRAGMA')) {
+                    return Promise.reject(new Error(`Action ${type} (WRITE) not permitted in Read-Only mode.`));
+                }
+            } else if (type !== 'INIT' && type !== 'GET_DIAGNOSTICS' && type !== 'EXPORT') {
+                return Promise.reject(new Error(`Action ${type} not permitted in Read-Only mode.`));
+            }
+        }
+
+        // Send request to master tab via BroadcastChannel
+        return new Promise<T>((resolve, reject) => {
+            const id = ++msgId;
+            const timeout = setTimeout(() => {
+                if (pending.has(id)) {
+                    pending.delete(id);
+                    console.error(`[DB] RPC Timeout for action: ${type} (Master tab unresponsive)`);
+                    reject(new Error(`Database Master unresponsive (Timeout after 5s). Please focus the first tab or refresh.`));
+                }
+            }, 5000);
+
+            pending.set(id, {
+                resolve: (val) => { clearTimeout(timeout); resolve(val); },
+                reject: (err) => { clearTimeout(timeout); reject(err); }
             });
-        }
-        if (type === 'INIT') return Promise.resolve(true as any);
-        if (type === 'GET_DIAGNOSTICS') {
-            return Promise.resolve({ dbSize: 0, pageCount: 0, pageSize: 0, tableStats: {} } as any);
-        }
-        return Promise.reject(new Error(`Action ${type} not permitted in Read-Only mode.`));
+            channel.postMessage({ type: 'RPC_REQ', id, actionType: type, payload });
+        });
     };
 
     if (!isMaster && isReadOnlyMode) {
-        return handleReadOnly();
+        return handleSlaveRpc();
     }
 
-    // Race getWorker and readOnlyPromise so querying tabs don't hang if they switch to read-only while waiting
-    return Promise.race([
-        getWorker(),
-        readOnlyPromise.then(() => 'READ_ONLY_MODE_ACTIVATED' as const)
-    ]).then(result => {
-        if (result === 'READ_ONLY_MODE_ACTIVATED') {
-            return handleReadOnly();
+    return getWorker().then(result => {
+        if (result === 'SLAVE') {
+            return handleSlaveRpc();
         }
         const w = result as Worker;
         return new Promise<T>((resolve, reject) => {

@@ -42,7 +42,8 @@ export const SystemRepository = {
         if (!isValidIdentifier(tableName)) {
             throw new Error(`Invalid table name: ${tableName}`);
         }
-        let sql = `SELECT * FROM ${tableName}`;
+        // Fetch rowid aliased as _rowid to ensure every record has a unique identifier
+        let sql = `SELECT rowid as _rowid, * FROM "${tableName}"`;
         const params: any[] = [];
 
         if (searchTerm) {
@@ -215,11 +216,27 @@ export const SystemRepository = {
 
     async getRecordMetadata(tableName: string, id: string | number): Promise<{ exists: boolean; isInWorklist: boolean; worklistItem: any | null }> {
         if (!isValidIdentifier(tableName)) return { exists: false, isInWorklist: false, worklistItem: null };
+        if (id === undefined || id === null) return { exists: false, isInWorklist: false, worklistItem: null };
 
-        // Combine existence check and worklist check into a single call (or parallel)
+        // Execute queries with individual catch blocks to prevent a failure in one (e.g., missing ID column)
+        // from crashing the entire metadata fetch array.
+        // Note: SQLite column names are generally case-insensitive in queries, but we use "id" as standard.
         const [existsResult, worklistResult] = await Promise.all([
-            runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]),
-            runQuery('SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?', [tableName, id])
+            runQuery(`SELECT 1 FROM "${tableName}" WHERE id = ? LIMIT 1`, [id]).catch(async () => {
+                // Fallback 1: try to find the actual primary key name if standard "id" fails
+                try {
+                    const columns = await this.getTableSchema(tableName);
+                    const pk = columns.find(c => c.pk === 1 || c.name.toLowerCase() === 'id')?.name;
+                    if (pk && pk.toLowerCase() !== 'id') {
+                        return await runQuery(`SELECT 1 FROM "${tableName}" WHERE "${pk}" = ? LIMIT 1`, [id]);
+                    }
+
+                    // Fallback 2: try rowid if no PK found or if the id looks like a rowid
+                    return await runQuery(`SELECT 1 FROM "${tableName}" WHERE rowid = ? LIMIT 1`, [id]);
+                } catch (e) { /* ignore */ }
+                return [];
+            }),
+            runQuery('SELECT * FROM sys_worklist WHERE source_table = ? AND source_id = ?', [tableName, id]).catch(() => [])
         ]);
 
         return {
