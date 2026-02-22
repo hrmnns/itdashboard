@@ -166,6 +166,14 @@ if (import.meta.hot) {
 }
 
 function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | ArrayBuffer): Promise<T> {
+    const start = performance.now();
+    window.dispatchEvent(new CustomEvent('db-query-start'));
+
+    const finish = () => {
+        const duration = performance.now() - start;
+        window.dispatchEvent(new CustomEvent('db-query-end', { detail: { duration } }));
+    };
+
     const handleSlaveRpc = () => {
         // If we are in explicit Read-Only mode (user accepted the conflict),
         // we restrict destructive actions.
@@ -199,24 +207,29 @@ function send<T>(type: string, payload?: Record<string, unknown> | DbRow[] | Arr
         });
     };
 
+    let p: Promise<T>;
+
     if (!isMaster && isReadOnlyMode) {
-        return handleSlaveRpc();
+        p = handleSlaveRpc();
+    } else {
+        p = getWorker().then(result => {
+            if (result === 'SLAVE') {
+                return handleSlaveRpc();
+            }
+            const w = result as Worker;
+            return new Promise<T>((resolve, reject) => {
+                const id = ++msgId;
+                pending.set(id, { resolve, reject });
+                w.postMessage({ id, type, payload });
+            });
+        });
     }
 
-    return getWorker().then(result => {
-        if (result === 'SLAVE') {
-            return handleSlaveRpc();
-        }
-        const w = result as Worker;
-        return new Promise<T>((resolve, reject) => {
-            const id = ++msgId;
-            pending.set(id, { resolve, reject });
-            w.postMessage({ id, type, payload });
-        });
-    });
+    return p.finally(finish);
 }
 
 export function notifyDbChange(count: number = 1, type: string = 'insert') {
+    console.log(`[DB] Dispatched db-changed event: type=${type}, count=${count}`);
     window.dispatchEvent(new CustomEvent('db-changed', {
         detail: { type, count }
     }));
@@ -236,6 +249,11 @@ export async function clearDatabase() {
     return send('CLEAR');
 }
 
+export async function factoryResetDatabase() {
+    await initDB();
+    return send('FACTORY_RESET');
+}
+
 export async function clearTable(tableName: string) {
     await initDB();
     return send('CLEAR_TABLE', { tableName });
@@ -247,7 +265,11 @@ export async function exportDatabase(): Promise<Uint8Array> {
 }
 
 export async function importDatabase(buffer: ArrayBuffer): Promise<any> {
-    return await send('IMPORT', buffer);
+    const result = await send<any>('IMPORT', buffer);
+    if (result && result.isValid) {
+        notifyDbChange(0, 'restore');
+    }
+    return result;
 }
 
 export async function loadDemoData(data?: any) {

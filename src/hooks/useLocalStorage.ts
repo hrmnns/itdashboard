@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * A hook to persist state in localStorage.
@@ -16,45 +16,52 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         }
         try {
             const item = window.localStorage.getItem(key);
-            // Parse stored json or if none return initialValue
-            // We handle simple strings and JSON objects
             if (item === null) return initialValue;
-
-            // Try to parse JSON, if it fails, return the string (legacy support or simple strings)
             try {
                 return JSON.parse(item);
             } catch {
                 return item as unknown as T;
             }
         } catch (error) {
-            console.error(error);
+            console.error('[useLocalStorage] Initial read error:', error);
             return initialValue;
         }
     });
 
-    // Return a wrapped version of useState's setter function that ...
-    // ... persists the new value to localStorage.
-    const setValue = (value: T | ((val: T) => T)) => {
-        try {
-            // Allow value to be a function so we have same API as useState
-            const valueToStore =
-                value instanceof Function ? value(storedValue) : value;
-
-            // Save state
-            setStoredValue(valueToStore);
-
-            // Save to local storage
-            if (typeof window !== 'undefined') {
-                if (typeof valueToStore === 'string') {
-                    window.localStorage.setItem(key, valueToStore);
-                } else {
-                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    // Cross-tab synchronization
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === key && e.newValue !== null) {
+                try {
+                    const nextValue = JSON.parse(e.newValue);
+                    setStoredValue(nextValue);
+                    console.log(`[useLocalStorage] Synced ${key} from other tab:`, nextValue);
+                } catch {
+                    setStoredValue(e.newValue as unknown as T);
                 }
             }
-        } catch (error) {
-            console.error(error);
-        }
-    };
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [key]);
+
+    const setValue = useCallback((value: T | ((val: T) => T)) => {
+        setStoredValue((currentStoredValue) => {
+            try {
+                const valueToStore = value instanceof Function ? value(currentStoredValue) : value;
+
+                if (typeof window !== 'undefined') {
+                    const serializedValue = typeof valueToStore === 'string' ? valueToStore : JSON.stringify(valueToStore);
+                    window.localStorage.setItem(key, serializedValue);
+                }
+                return valueToStore;
+            } catch (error) {
+                console.error('[useLocalStorage] Write error:', error);
+                return currentStoredValue;
+            }
+        });
+    }, [key]);
 
     return [storedValue, setValue] as const;
 }

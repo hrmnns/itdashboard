@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Info, Database, Upload, Table as TableIcon, Plus, Trash2, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
 import { ExcelImport, type ImportConfig } from '../components/ExcelImport';
 import { SmartImport } from '../components/SmartImport';
 import { SchemaTable } from '../components/SchemaDocumentation';
@@ -30,7 +30,13 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const { isReadOnly, isAdminMode } = useDashboard();
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>('import');
+    const [activeTab, setActiveTab] = useState<'import' | 'structure' | 'system'>(() => {
+        return (sessionStorage.getItem('litebistudio_datasource_tab') as any) || 'import';
+    });
+
+    useEffect(() => {
+        sessionStorage.setItem('litebistudio_datasource_tab', activeTab);
+    }, [activeTab]);
 
     // Import State
     const [selectedTable, setSelectedTable] = useState<string>('');
@@ -50,6 +56,7 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
     const [useEncryption, setUseEncryption] = useState(false);
     const [backupPassword, setBackupPassword] = useState('');
     const [restoreAlert, setRestoreAlert] = useState<{ type: AlertType; message: string; title?: string; details?: string } | null>(null);
+    const [isResetting, setIsResetting] = useState(false);
 
     // Fetch Tables
     const { data: tables, refresh: refreshTables } = useAsync<string[]>(
@@ -397,6 +404,18 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                     </div>
                                 )}
 
+                                {restoreAlert && (
+                                    <div className="mb-4">
+                                        <InlineAlert
+                                            type={restoreAlert.type}
+                                            title={restoreAlert.title}
+                                            message={restoreAlert.message}
+                                            details={restoreAlert.details}
+                                            onClose={() => setRestoreAlert(null)}
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                                     <button
                                         onClick={async () => {
@@ -427,30 +446,31 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         {useEncryption ? t('datasource.save_backup_secure') : t('datasource.save_backup_standard')}
                                     </button>
 
-                                    <div className="space-y-4">
-                                        {restoreAlert && (
-                                            <InlineAlert
-                                                type={restoreAlert.type}
-                                                title={restoreAlert.title}
-                                                message={restoreAlert.message}
-                                                details={restoreAlert.details}
-                                                onClose={() => setRestoreAlert(null)}
-                                            />
-                                        )}
-                                        <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
-                                            <input
-                                                type="file"
-                                                accept=".sqlite3"
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                onChange={async (e) => {
-                                                    setRestoreAlert(null);
-                                                    const file = e.target.files?.[0];
-                                                    if (!file) return;
+                                    <div className="relative flex items-center justify-center gap-2 p-3 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+                                        <input
+                                            type="file"
+                                            accept=".sqlite3,.sqlite,.db"
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            onChange={async (e) => {
+                                                const logTime = () => new Date().toLocaleTimeString();
+                                                console.log(`[Restore][${logTime()}] onChange triggered`);
+                                                setRestoreAlert(null);
+                                                const file = e.target.files?.[0];
+                                                if (!file) {
+                                                    console.log(`[Restore][${logTime()}] No file selected`);
+                                                    return;
+                                                }
+                                                console.log(`[Restore][${logTime()}] File selected:`, file.name, file.size, file.type);
 
+                                                try {
+                                                    console.log(`[Restore][${logTime()}] Calling file.arrayBuffer()...`);
                                                     const buffer = await file.arrayBuffer();
+                                                    console.log(`[Restore][${logTime()}] Buffer received, size:`, buffer.byteLength);
+
                                                     const header = new Uint8Array(buffer.slice(0, 16));
                                                     const headerString = new TextDecoder().decode(header);
                                                     const isSqlite = headerString.startsWith('SQLite format 3');
+                                                    console.log('[Restore] Header check - isSqlite:', isSqlite);
 
                                                     let finalBuffer = buffer;
 
@@ -473,9 +493,19 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                     }
 
                                                     if (confirm(t('datasource.restore_confirm'))) {
+                                                        console.log(`[Restore][${logTime()}] User confirmed restore. Starting process...`);
+                                                        setRestoreAlert({
+                                                            type: 'warning',
+                                                            title: t('common.loading'),
+                                                            message: 'Verarbeite Backup-Datei...',
+                                                        });
+
                                                         try {
+                                                            console.log(`[Restore][${logTime()}] Importing db module...`);
                                                             const { importDatabase } = await import('../../lib/db');
+                                                            console.log(`[Restore][${logTime()}] Calling worker importDatabase...`);
                                                             const report = await importDatabase(finalBuffer) as any;
+                                                            console.log(`[Restore][${logTime()}] Worker report received:`, report);
                                                             const { versionInfo } = report;
 
                                                             if (!report.headerMatch) {
@@ -526,9 +556,12 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                                     message: t('datasource.restore_success_reload'),
                                                                     details: versionInfo ? `Database Version: V${versionInfo.backup} (Upgraded to V${versionInfo.current})` : undefined
                                                                 });
+                                                                console.log(`[Restore][${logTime()}] Success! Reloading in 2s...`);
+                                                                markBackupComplete();
                                                                 setTimeout(() => window.location.reload(), 2000);
                                                             }
                                                         } catch (err: any) {
+                                                            console.error(`[Restore][${logTime()}] Inner Error:`, err);
                                                             setRestoreAlert({
                                                                 type: 'error',
                                                                 title: t('common.error'),
@@ -536,10 +569,17 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                                             });
                                                         }
                                                     }
-                                                }}
-                                            />
-                                            <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
-                                        </div>
+                                                } catch (err: any) {
+                                                    console.error(`[Restore][${logTime()}] Outer Error:`, err);
+                                                    setRestoreAlert({
+                                                        type: 'error',
+                                                        title: t('common.error'),
+                                                        message: err.message
+                                                    });
+                                                }
+                                            }}
+                                        />
+                                        <Upload className="w-4 h-4 text-amber-500" /> {t('datasource.restore_backup')}
                                     </div>
                                 </div>
                             </div>
@@ -616,6 +656,46 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
                                         <p className="text-[10px] text-slate-400 italic">{t('datasource.drop_table_hint')}</p>
                                     </div>
                                 </div>
+
+                                {/* Factory Reset Card */}
+                                <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/20 rounded-xl p-4 shadow-sm md:col-span-2">
+                                    <h4 className="text-xs font-black text-slate-400 uppercase mb-3">{t('datasource.factory_reset_title', 'Werkseinstellungen')}</h4>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                disabled={isResetting}
+                                                onClick={async () => {
+                                                    const confirmText = t('datasource.factory_reset_confirm', 'Bist du sicher? Alle Daten, Dashboards und Widgets werden endgültig gelöscht. Dies kann nicht rückgängig gemacht werden!');
+                                                    if (confirm(confirmText)) {
+                                                        const promptText = prompt(t('datasource.factory_reset_prompt', 'Bitte tippe "RESET" ein, um fortzufahren:'));
+                                                        if (promptText === 'RESET') {
+                                                            try {
+                                                                setIsResetting(true);
+                                                                const { factoryResetDatabase } = await import('../../lib/db');
+                                                                await factoryResetDatabase();
+                                                                alert(t('datasource.factory_reset_success', 'Datenbank wurde auf Werkseinstellungen zurückgesetzt! Lade neu...'));
+                                                                markBackupComplete();
+                                                                sessionStorage.removeItem('litebistudio_datasource_tab');
+                                                                window.location.hash = '#/';
+                                                                window.location.reload();
+                                                            } catch (err: any) {
+                                                                setIsResetting(false);
+                                                                alert(err.message);
+                                                            }
+                                                        } else if (promptText !== null) {
+                                                            alert(t('datasource.factory_reset_aborted', 'Abgebrochen: Falsche Eingabe.'));
+                                                        }
+                                                    }
+                                                }}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-900 hover:bg-black text-white rounded font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isResetting && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                {t('datasource.factory_reset_btn', 'Komplett zurücksetzen')}
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 italic">{t('datasource.factory_reset_hint', 'Löscht die gesamte Datenbank und erstellt ein frisches, leeres Schema der neuesten Version.')}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -672,6 +752,6 @@ export const DatasourceView: React.FC<DatasourceViewProps> = ({ onImportComplete
             <Modal isOpen={isSchemaOpen} onClose={() => setIsSchemaOpen(false)} title={tableSchema?.title || selectedTable}>
                 {tableSchema ? <SchemaTable schema={tableSchema} /> : <div className="p-4 text-center">{t('datasource.schema_not_available')}</div>}
             </Modal>
-        </PageLayout>
+        </PageLayout >
     );
 };

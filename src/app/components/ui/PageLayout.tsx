@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, Activity } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 /* ─── Alert Types ─── */
@@ -85,6 +85,26 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
     fillHeight,
 }) => {
     const { t } = useTranslation();
+    const [activeQueries, setActiveQueries] = useState(0);
+    const [lastQueryMs, setLastQueryMs] = useState<number | null>(null);
+
+    useEffect(() => {
+        const onStart = () => setActiveQueries(q => q + 1);
+        const onEnd = (e: any) => {
+            setActiveQueries(q => Math.max(0, q - 1));
+            if (e.detail?.duration !== undefined) {
+                setLastQueryMs(e.detail.duration);
+            }
+        };
+
+        window.addEventListener('db-query-start', onStart);
+        window.addEventListener('db-query-end', onEnd);
+        return () => {
+            window.removeEventListener('db-query-start', onStart);
+            window.removeEventListener('db-query-end', onEnd);
+        };
+    }, []);
+
     return (
         <div className={cn('h-full flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-500', className)}>
             {/* ── Header ── */}
@@ -172,11 +192,28 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
             </div>
 
             {/* ── Footer ── */}
-            {(footer || (breadcrumbs && breadcrumbs.length > 0)) && (
+            {(footer || (breadcrumbs && breadcrumbs.length > 0) || activeQueries > 0 || lastQueryMs !== null) && (
                 <footer className="flex-shrink-0 px-6 md:px-8 py-3 border-t border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="text-xs text-slate-400 dark:text-slate-500">
-                            {footer}
+                        <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
+                            {footer && <div>{footer}</div>}
+
+                            {/* Global Loading & Performance Indicator */}
+                            {(activeQueries > 0 || lastQueryMs !== null) && (
+                                <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-all" title="Letzte Datenbank-Antwortzeit">
+                                    {activeQueries > 0 ? (
+                                        <>
+                                            <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('common.loading', 'LÄDT...')}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Activity className="w-3 h-3 text-emerald-500" />
+                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{Math.round(lastQueryMs!)} ms</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         {breadcrumbs && breadcrumbs.length > 0 && (
                             <nav className="flex items-center gap-1.5 text-[10px] uppercase font-black tracking-wider">

@@ -302,6 +302,26 @@ async function handleMessage(e: MessageEvent) {
                 result = true;
                 break;
 
+            case 'FACTORY_RESET':
+                if (db) {
+                    log('Closing database for factory reset...');
+                    db.close();
+                    db = null;
+                }
+                if (sqlite3 && sqlite3.oo1.OpfsDb) {
+                    try {
+                        const root = await navigator.storage.getDirectory();
+                        await root.removeEntry('litebistudio.sqlite3');
+                        log('OPFS file deleted for factory reset.');
+                    } catch (e) {
+                        log('No OPFS file to delete or error:', e);
+                    }
+                }
+                initPromise = null; // Reset init promise
+                await initDB();
+                result = true;
+                break;
+
             case 'CLEAR_TABLE':
                 if (!db) await initDB();
                 const cleanTableName = payload.tableName;
@@ -473,8 +493,9 @@ async function importDatabase(buffer: ArrayBuffer) {
             report.isDowngrade = true;
             report.error = `The backup (V${backupVersion}) is newer than this application (V${CURRENT_SCHEMA_VERSION}). Please update the application first.`;
         } else {
-            report.isValid = report.missingTables.length === 0;
-            // Note: missingColumns is informative, we upgrade them during applyMigrations anyway
+            // We allow missing tables because applyMigrations will create them for older backups
+            // We just ensure it's a valid SQLite DB (which the header check passed).
+            report.isValid = true;
         }
 
         // 3. Finalize Import (write to OPFS)

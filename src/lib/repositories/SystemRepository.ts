@@ -124,7 +124,7 @@ export const SystemRepository = {
         }));
     },
 
-    async saveDashboard(dashboard: any): Promise<void> {
+    async saveDashboard(dashboard: any, silent: boolean = false): Promise<void> {
         const existing = await runQuery('SELECT id FROM sys_dashboards WHERE id = ?', [dashboard.id]);
         if (existing.length > 0) {
             await runQuery(
@@ -137,7 +137,7 @@ export const SystemRepository = {
                 [dashboard.id, dashboard.name, JSON.stringify(dashboard.layout), dashboard.is_default ? 1 : 0]
             );
         }
-        notifyDbChange();
+        if (!silent) notifyDbChange();
     },
 
     async deleteDashboard(id: string): Promise<void> {

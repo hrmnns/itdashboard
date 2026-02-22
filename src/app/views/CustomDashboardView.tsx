@@ -60,9 +60,14 @@ export const CustomDashboardView: React.FC = () => {
         []
     );
 
+    const initRef = React.useRef(false);
+
     // Initial Load & Migration
     useEffect(() => {
         const init = async () => {
+            if (initRef.current) return;
+            initRef.current = true;
+
             let dbDashboards = await SystemRepository.getDashboards();
 
             // Migration from localStorage
@@ -74,7 +79,7 @@ export const CustomDashboardView: React.FC = () => {
                     layout: legacyLayout ? JSON.parse(legacyLayout) : [],
                     is_default: true
                 };
-                await SystemRepository.saveDashboard(defaultDash);
+                await SystemRepository.saveDashboard(defaultDash, true);
                 if (legacyLayout) localStorage.removeItem('custom_dashboard_layout');
                 dbDashboards = [defaultDash];
             } else if (dbDashboards.length > 0) {

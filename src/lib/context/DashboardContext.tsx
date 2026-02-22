@@ -53,12 +53,16 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         const handleDbChange = (e: any) => {
             const detail = e.detail || {};
             if (detail.type === 'restore') {
+                console.log('[DashboardContext] DB Restore detected. Resetting count to 0.');
                 setChangeCount(0);
                 setLastBackup(new Date().toISOString());
             } else if (detail.type === 'clear') {
+                console.log('[DashboardContext] DB Clear detected. Incrementing count.');
                 setChangeCount((prev: number) => prev + 1);
             } else {
-                setChangeCount((prev: number) => prev + (detail.count || 1));
+                const count = detail.count || 1;
+                console.log(`[DashboardContext] DB Change detected (${detail.type}, count=${count}). New count will be based on current state.`);
+                setChangeCount((prev: number) => prev + count);
             }
         };
 
